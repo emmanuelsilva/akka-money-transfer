@@ -1,5 +1,5 @@
 scalaVersion := "2.13.1"
-name := "hello-world"
+name := "akka-money-transfer"
 organization := "br.com.emmanuel.moneytransfer"
 version := "1.0"
 
