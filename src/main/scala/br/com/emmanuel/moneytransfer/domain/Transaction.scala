@@ -1,4 +1,4 @@
-package br.com.emmanuel.moneytransfer.domain.entity
+package br.com.emmanuel.moneytransfer.domain
 
 abstract class Transaction(val amount: BigDecimal)
 

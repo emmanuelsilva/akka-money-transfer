@@ -2,7 +2,7 @@ package br.com.emmanuel.moneytransfer.infrastructure.actors
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
-import br.com.emmanuel.moneytransfer.domain.entity.{DepositTransaction, Transaction, WithdrawTransaction}
+import br.com.emmanuel.moneytransfer.domain.{DepositTransaction, Transaction, WithdrawTransaction}
 
 import scala.collection.mutable.Seq
 
