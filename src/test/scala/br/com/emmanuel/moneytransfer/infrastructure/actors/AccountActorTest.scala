@@ -11,6 +11,21 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
 
   override protected def afterAll(): Unit = super.afterAll()
 
+  "should return all transactions for one account" in {
+    val probe = createAccountResponseProbe
+    val account = Account("123")
+    val accountActor = createAccountActor(account)
+
+    accountActor ! Deposit(100)
+    accountActor ! Deposit(50)
+    accountActor ! Withdraw(50, probe.ref)
+
+    accountActor ! GetTransactions(probe.ref)
+    val transactions = probe.expectMessageType[Transactions]
+
+    assertResult(3)(transactions.transactions.size)
+  }
+
   "should return insufficient funds when there is not balance to create P2P transfer" in {
     val probe = createAccountResponseProbe
 
@@ -124,13 +139,13 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
   private def assertThatBalanceIs(probe: TestProbe[AccountActor.Response],
                                           account: Account,
                                           amount: BigDecimal): Unit = {
-    probe.expectMessage(AccountActor.Balance(account, amount))
+    probe.expectMessage(Balance(account, amount))
   }
 
   private def assertThatInsufficientFundsWasReceived(account: Account,
                                                      probe: TestProbe[AccountActor.Response],
                                                      command: AccountActor.Command) = {
-    probe.expectMessage(AccountActor.InsufficientFunds(account, command))
+    probe.expectMessage(InsufficientFunds(account, command))
   }
 
 }

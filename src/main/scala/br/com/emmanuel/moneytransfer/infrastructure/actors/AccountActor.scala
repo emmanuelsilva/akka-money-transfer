@@ -19,9 +19,11 @@ object AccountActor {
   final case class Withdraw(amount: BigDecimal, reply: ActorRef[Response]) extends Command
   final case class P2PTransfer(amount: BigDecimal, destinationAccount: AccountRef, reply: ActorRef[Response]) extends Command
   final case class GetBalance(reply : ActorRef[Response]) extends Command
+  final case class GetTransactions(reply: ActorRef[Response]) extends Command
 
   sealed trait Response
   final case class Balance(account: Account, amount: BigDecimal) extends Response
+  final case class Transactions(account: Account, transactions: Seq[Transaction]) extends Response
   final case class InsufficientFunds(account: Account, command: Command) extends Response
 }
 
@@ -65,6 +67,10 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
       case GetBalance(reply) =>
         val currentBalance = computeCurrentBalance()
         reply ! Balance(account, currentBalance)
+        this
+
+      case GetTransactions(reply) =>
+        reply ! Transactions(account, transactions)
         this
     }
   }
