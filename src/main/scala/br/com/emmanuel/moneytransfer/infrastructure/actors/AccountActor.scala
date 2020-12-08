@@ -36,8 +36,11 @@ class AccountActor(context: ActorContext[AccountActor.Command], accountId: Strin
     }).sum
   }
 
-  def hasEnoughBalance(debitAmount: BigDecimal): Boolean = {
-    getBalance() >= debitAmount
+  def hasEnoughBalance(debitAmount: BigDecimal): Either[String, BigDecimal] = {
+    val currentBalance = getBalance()
+
+    if (currentBalance < debitAmount) Left("Insufficient funds")
+    else Right(currentBalance)
   }
 
   override def onMessage(msg: Command): Behavior[Command] = {
@@ -47,11 +50,10 @@ class AccountActor(context: ActorContext[AccountActor.Command], accountId: Strin
         this
 
       case Withdraw(amount, reply) =>
-        if (hasEnoughBalance(amount))
-          transactions = transactions :+ WithdrawTransaction(amount)
-        else
-          reply ! InsufficientFunds(accountId, msg)
-
+        hasEnoughBalance(amount) match {
+          case Left(_) => reply ! InsufficientFunds(accountId, msg)
+          case Right(_) => transactions = transactions :+ WithdrawTransaction(amount)
+        }
         this
 
       case GetBalance(reply) =>
