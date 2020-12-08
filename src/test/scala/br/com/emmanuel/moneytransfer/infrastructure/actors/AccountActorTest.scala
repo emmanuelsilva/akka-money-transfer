@@ -1,7 +1,6 @@
 package br.com.emmanuel.moneytransfer.infrastructure.actors
 
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
-import akka.actor.typed.ActorRef
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
 class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
@@ -13,14 +12,24 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
   "should deposit 100, withdraw 100 and the balance is zero" in {
     val accountId = "123"
     val accountActor = createAccountActor(accountId)
+    val probe = createAccountResponseProbe
 
     accountActor ! AccountActor.Deposit(100)
-    accountActor ! AccountActor.Withdraw(100)
+    accountActor ! AccountActor.Withdraw(100, probe.ref)
 
-    val probe = createAccountResponseProbe
     accountActor ! AccountActor.GetBalance(probe.ref)
-
     assertThatBalanceIs(probe, accountId, 0)
+  }
+
+  "should return insufficient funds when there is no available balance to withdraw operation" in {
+    val accountId = "123"
+    val accountActor = createAccountActor(accountId)
+    val probe = createAccountResponseProbe
+
+    val withdrawCommand = AccountActor.Withdraw(100, probe.ref)
+    accountActor ! withdrawCommand
+
+    assertThatInsufficientFundsWasReceived(accountId, probe, withdrawCommand)
   }
 
   "should deposit 100 and change balance amount to 100" in {
@@ -76,5 +85,10 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
     probe.expectMessage(AccountActor.Balance(accountId, amount))
   }
 
+  private def assertThatInsufficientFundsWasReceived(accountId: String,
+                                                     probe: TestProbe[AccountActor.Response],
+                                                     command: AccountActor.Command) = {
+    probe.expectMessage(AccountActor.InsufficientFunds(accountId, command))
+  }
 
 }
