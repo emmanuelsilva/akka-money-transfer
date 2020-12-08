@@ -35,7 +35,7 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
     val destinationAccount = Account("456")
     val destinationAccountActor = createAccountActor(destinationAccount)
 
-    val p2pTransferCommand = P2PTransfer(100, AccountRef(destinationAccount, destinationAccountActor), probe.ref)
+    val p2pTransferCommand = P2PTransfer(100, AccountWithRef(destinationAccount, destinationAccountActor), probe.ref)
     sourceAccountActor ! p2pTransferCommand
 
     assertThatInsufficientFundsWasReceived(sourceAccount, probe, p2pTransferCommand)
@@ -57,7 +57,7 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
     val destinationAccountActor = createAccountActor(destinationAccount)
 
     sourceAccountActor ! Deposit(100)
-    sourceAccountActor ! P2PTransfer(100, AccountRef(destinationAccount, destinationAccountActor), probe.ref)
+    sourceAccountActor ! P2PTransfer(100, AccountWithRef(destinationAccount, destinationAccountActor), probe.ref)
 
     sourceAccountActor ! GetBalance(probe.ref)
     assertThatBalanceIs(probe, sourceAccount, 0)
