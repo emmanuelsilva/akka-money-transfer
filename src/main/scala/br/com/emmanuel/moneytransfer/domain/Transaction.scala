@@ -1,7 +1,7 @@
 package br.com.emmanuel.moneytransfer.domain
 
-abstract class Transaction(val amount: BigDecimal)
+trait Transaction
 
-case class DepositTransaction(depositAmount: BigDecimal) extends Transaction(depositAmount)
+case class DepositTransaction(amount: BigDecimal) extends Transaction()
 
-case class WithdrawTransaction(withdrawAmount: BigDecimal) extends Transaction(withdrawAmount)
+case class WithdrawTransaction(amount: BigDecimal) extends Transaction()
