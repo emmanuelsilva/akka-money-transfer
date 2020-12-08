@@ -54,12 +54,12 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
         deposit(amount)
         this
 
-      case Withdraw(amount, reply) =>
-        withdraw(msg, amount, reply)
+      case command: Withdraw =>
+        withdraw(command)
         this
 
-      case p2pCommand: P2PTransfer =>
-        p2p(p2pCommand)
+      case command: P2PTransfer =>
+        p2p(command)
         this
 
       case GetBalance(reply) =>
@@ -79,10 +79,10 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
     }
   }
 
-  private def withdraw(msg: Command, amount: BigDecimal, reply: ActorRef[Response]) = {
-    hasEnoughBalance(amount) match {
-      case Left(_) => reply ! InsufficientFunds(account, msg)
-      case Right(_) => transactions = transactions :+ WithdrawTransaction(amount)
+  private def withdraw(withdraw: Withdraw) = {
+    hasEnoughBalance(withdraw.amount) match {
+      case Left(_) => withdraw.reply ! InsufficientFunds(account, withdraw)
+      case Right(_) => transactions = transactions :+ WithdrawTransaction(withdraw.amount)
     }
   }
 
