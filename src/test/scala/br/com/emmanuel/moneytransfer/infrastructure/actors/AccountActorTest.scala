@@ -10,7 +10,20 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
 
   override protected def afterAll(): Unit = super.afterAll()
 
-  "should receive deposit and change balance amount" in {
+  "should deposit 100, withdraw 100 and the balance is zero" in {
+    val accountId = "123"
+    val accountActor = createAccountActor(accountId)
+
+    accountActor ! AccountActor.Deposit(100)
+    accountActor ! AccountActor.Withdraw(100)
+
+    val probe = createAccountResponseProbe
+    accountActor ! AccountActor.GetBalance(probe.ref)
+
+    assertThatBalanceIs(probe, accountId, 0)
+  }
+
+  "should deposit 100 and change balance amount to 100" in {
     val accountId = "123"
     val accountActor = createAccountActor(accountId)
 
@@ -19,14 +32,15 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
     val probe = createAccountResponseProbe
     accountActor ! AccountActor.GetBalance(probe.ref)
 
-    assertThatExpectedBalanceIs(probe, accountId, 100)
+    assertThatBalanceIs(probe, accountId, 100)
   }
 
-  "should receive all deposits message and change balance" in {
+  "should receive 1000 deposits and change balance amount to 100000" in {
     val accountId = "123"
     val accountActor = createAccountActor(accountId)
     val depositAmount = 100
     val depositQuantity = 1000
+    val expectedFinalAmount = depositAmount * depositQuantity
 
     for (_ <- 1 to depositQuantity) {
       accountActor ! AccountActor.Deposit(depositAmount)
@@ -35,17 +49,17 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
     val probe = createAccountResponseProbe
     accountActor ! AccountActor.GetBalance(probe.ref)
 
-    assertThatExpectedBalanceIs(probe, accountId, depositAmount * depositQuantity)
+    assertThatBalanceIs(probe, accountId, expectedFinalAmount)
   }
 
-  "should retrieve balance amount" in {
+  "should retrieve balance when it is empty" in {
     val accountId = "123"
     val accountActor = createAccountActor(accountId)
 
     val probe = createAccountResponseProbe
     accountActor ! AccountActor.GetBalance(probe.ref)
 
-    assertThatExpectedBalanceIs(probe, accountId, 0)
+    assertThatBalanceIs(probe, accountId, 0)
   }
 
   private def createAccountActor(accountId: String) =
@@ -56,7 +70,7 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
     testKit.createTestProbe[AccountActor.Response]()
 
 
-  private def assertThatExpectedBalanceIs(probe: TestProbe[AccountActor.Response],
+  private def assertThatBalanceIs(probe: TestProbe[AccountActor.Response],
                                           accountId: String,
                                           amount: BigDecimal): Unit = {
     probe.expectMessage(AccountActor.Balance(accountId, amount))

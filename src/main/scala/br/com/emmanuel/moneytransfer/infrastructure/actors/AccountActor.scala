@@ -1,9 +1,10 @@
 package br.com.emmanuel.moneytransfer.infrastructure.actors
 
-import scala.collection.mutable.Seq
-import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import br.com.emmanuel.moneytransfer.domain.entity.{DepositTransaction, Transaction}
+import akka.actor.typed.{ActorRef, Behavior}
+import br.com.emmanuel.moneytransfer.domain.entity.{DepositTransaction, Transaction, WithdrawTransaction}
+
+import scala.collection.mutable.Seq
 
 object AccountActor {
 
@@ -13,6 +14,7 @@ object AccountActor {
 
   sealed trait Command
   final case class Deposit(amount: BigDecimal) extends Command
+  final case class Withdraw(amount: BigDecimal) extends Command
   final case class GetBalance(reply : ActorRef[Response]) extends Command
 
   sealed trait Response
@@ -32,9 +34,18 @@ class AccountActor(context: ActorContext[AccountActor.Command], accountId: Strin
         transactions = transactions :+ DepositTransaction(amount)
         this
 
+      case Withdraw(amount) =>
+        transactions = transactions :+ WithdrawTransaction(amount)
+        this
+
       case GetBalance(reply) =>
-        val balance = transactions.map(_.amount).sum
+        val balance= transactions.map(_ match {
+          case DepositTransaction(amount) => amount
+          case WithdrawTransaction(amount) => amount * -1
+        }).sum
+
         reply ! Balance(accountId, balance)
+
         this
     }
   }
