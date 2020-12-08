@@ -1,7 +1,5 @@
 package br.com.emmanuel.moneytransfer.domain
 
-case class Account(id: String)
-
 sealed trait Transaction
 
 case class DepositTransaction(amount: BigDecimal) extends Transaction

@@ -7,7 +7,7 @@ import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
 class AccountActorTest extends WordSpecLike with BeforeAndAfterAll {
 
-  val testKit = ActorTestKit()
+  val testKit: ActorTestKit = ActorTestKit()
 
   override protected def afterAll(): Unit = super.afterAll()
 
