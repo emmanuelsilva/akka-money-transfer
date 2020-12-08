@@ -3,19 +3,18 @@ package br.com.emmanuel.moneytransfer.infrastructure.actors
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
 import br.com.emmanuel.moneytransfer.domain.Account
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor.{Accounts, CreateAccount, GetAccounts}
-import org.scalactic.source.Position
 import org.scalatest.{BeforeAndAfter, WordSpecLike}
 
 class BankActorTest extends WordSpecLike with BeforeAndAfter {
 
   val testKit: ActorTestKit = ActorTestKit()
-  var probe: TestProbe[BankActor.Response] = createBankResponseProbe
+  var probe: TestProbe[BankActor.Response] = null
 
-  override protected def before(fun: => Any)(implicit pos: Position): Unit = {
+  before {
     probe = createBankResponseProbe
   }
 
-  override protected def after(fun: => Any)(implicit pos: Position): Unit = {
+  after {
     probe.stop()
   }
 
@@ -27,6 +26,8 @@ class BankActorTest extends WordSpecLike with BeforeAndAfter {
     bankActor ! GetAccounts(probe.ref)
 
     val getAccountsResponse = probe.expectMessageType[Accounts]
+
+    assertResult(1)(getAccountsResponse.accounts.size)
     assert(getAccountsResponse.accounts.contains(account))
   }
 
