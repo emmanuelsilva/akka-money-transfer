@@ -6,6 +6,7 @@ import br.com.emmanuel.moneytransfer.domain.Account
 import br.com.emmanuel.moneytransfer.infrastructure.actors.AccountActor.AccountWithRef
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor.Command
 
+import scala.collection.immutable
 import scala.collection.mutable.Seq
 
 object BankActor {
@@ -20,7 +21,7 @@ object BankActor {
   case class GetAccounts(reply: ActorRef[Response]) extends Command
 
   sealed trait Response
-  case class Accounts(accounts: Seq[Account]) extends Response
+  case class Accounts(accounts: immutable.Seq[Account]) extends Response
 }
 
 class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavior[Command](context) {
@@ -36,7 +37,7 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
         accounts = accounts :+ AccountWithRef(account, accountActorRef)
         this
       case GetAccounts(reply) =>
-        reply ! Accounts(accounts.map(_.account))
+        reply ! Accounts(accounts.map(_.account).toSeq)
         this
     }
   }
