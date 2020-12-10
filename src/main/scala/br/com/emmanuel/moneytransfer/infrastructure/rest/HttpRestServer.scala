@@ -13,7 +13,7 @@ import spray.json.DefaultJsonProtocol
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
 
-object HttpRestApi extends SprayJsonSupport with DefaultJsonProtocol {
+object HttpRestServer extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val system: ActorSystem[BankActor.Command] = ActorSystem(BankActor(), "bank")
   implicit val executionContext: ExecutionContext = system.executionContext

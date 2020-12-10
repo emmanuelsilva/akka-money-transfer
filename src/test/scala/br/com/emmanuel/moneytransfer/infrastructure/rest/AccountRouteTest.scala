@@ -2,13 +2,16 @@ package br.com.emmanuel.moneytransfer.infrastructure.rest
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.marshalling.Marshal
+import akka.http.scaladsl.model.{MessageEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.util.Timeout
 import br.com.emmanuel.moneytransfer.domain.Account
-import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor.{Accounts, Command, GetAccounts}
+import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor
+import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor.{Accounts, Command, CreateAccount, GetAccounts, Response}
 import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
+import org.scalatest.concurrent.ScalaFutures._
 
 import scala.concurrent.duration.DurationInt
 
@@ -20,6 +23,24 @@ class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRo
   implicit val scheduler = system.scheduler
 
   val testKit: ActorTestKit = ActorTestKit()
+
+  "post /accounts with valid body should create account" in {
+    val bankActor = testKit.spawn(BankActor())
+    val probe = testKit.createTestProbe[Response]
+    val account = Account("123")
+    val accountPostEntity = Marshal(account).to[MessageEntity].futureValue
+
+    val testedRoute = Post("/accounts", accountPostEntity) ~> AccountRoute.route(bankActor)
+
+    testedRoute ~> check {
+      status shouldEqual StatusCodes.Created
+    }
+
+    bankActor ! GetAccounts(probe.ref)
+    val getAllAccountsResponse = probe.expectMessageType[Accounts]
+    assertResult(1)(getAllAccountsResponse.accounts.size)
+    assert(getAllAccountsResponse.accounts.contains(account))
+  }
 
   "get /accounts should return 10 registered accounts" in {
     val probe = testKit.createTestProbe[Command]

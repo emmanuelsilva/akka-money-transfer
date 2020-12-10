@@ -50,8 +50,7 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
         this
 
       case GetBalance(reply) =>
-        val currentBalance = computeCurrentBalance()
-        reply ! Balance(account, currentBalance)
+        reply ! Balance(account, computeCurrentBalance())
         this
 
       case GetTransactions(reply) =>
@@ -75,12 +74,12 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
     else Right(currentBalance)
   }
 
-  private def p2p(p2pCommand: P2PTransfer) = {
-    hasEnoughBalance(p2pCommand.amount) match {
-      case Left(_) => p2pCommand.reply ! InsufficientFunds(account, p2pCommand)
+  private def p2p(command: P2PTransfer) = {
+    hasEnoughBalance(command.amount) match {
+      case Left(_) => command.reply ! InsufficientFunds(account, command)
       case Right(_) => {
-        transactions = transactions :+ WithdrawTransaction(p2pCommand.amount)
-        p2pCommand.destinationAccount.accountRef ! Deposit(p2pCommand.amount)
+        transactions = transactions :+ WithdrawTransaction(command.amount)
+        command.destinationAccount.accountRef ! Deposit(command.amount)
       }
     }
   }
