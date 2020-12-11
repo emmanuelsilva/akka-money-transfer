@@ -9,9 +9,9 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.util.Timeout
 import br.com.emmanuel.moneytransfer.domain.Account
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor
-import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor.{Accounts, Command, CreateAccount, GetAccounts, Response}
-import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
+import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor._
 import org.scalatest.concurrent.ScalaFutures._
+import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
 
 import scala.concurrent.duration.DurationInt
 
@@ -23,6 +23,21 @@ class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRo
   implicit val scheduler = system.scheduler
 
   val testKit: ActorTestKit = ActorTestKit()
+
+  "get /accounts/123/balance should return zero balance when there is no transactions" in {
+    val bankActor = testKit.spawn(BankActor())
+    val account = Account("123")
+    bankActor ! CreateAccount(account)
+
+    val testedRoute = Get("/accounts/123/balance") ~> AccountRoute.route(bankActor)
+
+    testedRoute ~> check {
+      status shouldEqual StatusCodes.OK
+      val accountBalance = responseAs[AccountBalance]
+      accountBalance.account shouldBe account
+      accountBalance.balance shouldBe 0
+    }
+  }
 
   "post /accounts with valid body should create account" in {
     val bankActor = testKit.spawn(BankActor())

@@ -15,16 +15,16 @@ object AccountActor {
   final case class AccountWithRef(account: Account, accountRef: ActorRef[Command])
 
   sealed trait Command
-  final case class Deposit(amount: BigDecimal) extends Command
-  final case class Withdraw(amount: BigDecimal, reply: ActorRef[Response]) extends Command
-  final case class P2PTransfer(amount: BigDecimal, destinationAccount: AccountWithRef, reply: ActorRef[Response]) extends Command
-  final case class GetBalance(reply : ActorRef[Response]) extends Command
-  final case class GetTransactions(reply: ActorRef[Response]) extends Command
+  case class Deposit(amount: BigDecimal) extends Command
+  case class Withdraw(amount: BigDecimal, reply: ActorRef[Response]) extends Command
+  case class P2PTransfer(amount: BigDecimal, destinationAccount: AccountWithRef, reply: ActorRef[Response]) extends Command
+  case class GetBalance(reply : ActorRef[Response]) extends Command
+  case class GetTransactions(reply: ActorRef[Response]) extends Command
 
   sealed trait Response
-  final case class Balance(account: Account, amount: BigDecimal) extends Response
-  final case class Transactions(account: Account, transactions: Seq[Transaction]) extends Response
-  final case class InsufficientFunds(account: Account, command: Command) extends Response
+  case class Balance(account: Account, amount: BigDecimal) extends Response
+  case class Transactions(account: Account, transactions: Seq[Transaction]) extends Response
+  case class InsufficientFunds(account: Account, command: Command) extends Response
 }
 
 class AccountActor(context: ActorContext[AccountActor.Command], account: Account)

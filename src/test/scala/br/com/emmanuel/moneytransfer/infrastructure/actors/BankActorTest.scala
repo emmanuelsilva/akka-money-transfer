@@ -2,10 +2,10 @@ package br.com.emmanuel.moneytransfer.infrastructure.actors
 
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
 import br.com.emmanuel.moneytransfer.domain.Account
-import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor.{Accounts, CreateAccount, GetAccounts}
-import org.scalatest.{BeforeAndAfter, WordSpecLike}
+import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor._
+import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
 
-class BankActorTest extends WordSpecLike with BeforeAndAfter {
+class BankActorTest extends WordSpecLike with BeforeAndAfter with Matchers {
 
   val testKit: ActorTestKit = ActorTestKit()
   var probe: TestProbe[BankActor.Response] = null
@@ -29,6 +29,27 @@ class BankActorTest extends WordSpecLike with BeforeAndAfter {
 
     assertResult(1)(getAccountsResponse.accounts.size)
     assert(getAccountsResponse.accounts.contains(account))
+  }
+
+  "should deposit 10 in a created account" in {
+    val bankActor = testKit.spawn(BankActor())
+    val account = Account("123")
+
+    bankActor ! CreateAccount(account)
+    bankActor ! Deposit(10, account, probe.ref)
+  }
+
+  "should return the account balance after deposit 100" in {
+    val bankActor = testKit.spawn(BankActor())
+    val account = Account("123")
+
+    bankActor ! CreateAccount(account)
+    bankActor ! Deposit(100, account, probe.ref)
+    bankActor ! GetAccountBalance(account, probe.ref)
+
+    val accountBalance = probe.expectMessageType[AccountBalance]
+    accountBalance.account shouldBe account
+    accountBalance.balance shouldBe 100
   }
 
   private def createBankResponseProbe =
