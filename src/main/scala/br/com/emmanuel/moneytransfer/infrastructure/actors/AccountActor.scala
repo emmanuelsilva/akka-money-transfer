@@ -36,27 +36,14 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
 
   override def onMessage(msg: Command): Behavior[Command] = {
     msg match {
-
-      case Deposit(amount) =>
-        deposit(amount)
-        this
-
-      case command: Withdraw =>
-        withdraw(command)
-        this
-
-      case command: P2PTransfer =>
-        p2p(command)
-        this
-
-      case GetBalance(reply) =>
-        reply ! Balance(account, computeCurrentBalance())
-        this
-
-      case GetTransactions(reply) =>
-        reply ! Transactions(account, transactions)
-        this
+      case Deposit(amount) => deposit(amount)
+      case command: Withdraw => withdraw(command)
+      case command: P2PTransfer => p2p(command)
+      case GetBalance(reply) => reply ! Balance(account, computeCurrentBalance())
+      case GetTransactions(reply) => reply ! Transactions(account, transactions)
     }
+
+    this
   }
 
   private def computeCurrentBalance(): BigDecimal = {
@@ -69,7 +56,6 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
 
   private def hasEnoughBalance(debitAmount: BigDecimal): Either[String, BigDecimal] = {
     val currentBalance = computeCurrentBalance()
-
     if (currentBalance < debitAmount) Left("Insufficient funds")
     else Right(currentBalance)
   }
