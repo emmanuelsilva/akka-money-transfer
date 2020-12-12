@@ -48,16 +48,14 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
 
   private def computeCurrentBalance(): BigDecimal = {
     transactions.map(_ match {
-      case DepositTransaction(amount) => amount
-      case WithdrawTransaction(amount) => amount * -1
-      case P2PTransferTransaction(amount, _) => amount * -1
+      case credit: CreditTransaction => credit.amount
+      case debit: DebitTransaction => debit.amount * -1
     }).sum
   }
 
   private def hasEnoughBalance(debitAmount: BigDecimal): Either[String, BigDecimal] = {
     val currentBalance = computeCurrentBalance()
-    if (currentBalance < debitAmount) Left("Insufficient funds")
-    else Right(currentBalance)
+    Either.cond(currentBalance >= debitAmount, currentBalance, "Insufficient funds")
   }
 
   private def p2p(command: P2PTransfer) = {

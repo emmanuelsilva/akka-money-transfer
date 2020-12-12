@@ -24,8 +24,8 @@ object BankActor {
   case class AccountNotFound(account: Account) extends Response
   case class AccountBalance(account: Account, balance: BigDecimal) extends Response
 
-  sealed trait InternalMessage extends Command
-  private case class WrappedAccountResponse(response: AccountActor.Response, reply: ActorRef[Response]) extends InternalMessage
+  sealed trait WrappedMessage extends Command
+  private case class WrappedAccountResponse(response: AccountActor.Response, reply: ActorRef[Response]) extends WrappedMessage
 }
 
 class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavior[Command](context) {
