@@ -24,7 +24,7 @@ object AccountActor {
   sealed trait Response
   case class Balance(account: Account, amount: BigDecimal) extends Response
   case class Transactions(account: Account, transactions: Seq[Transaction]) extends Response
-  case class InsufficientFunds(account: Account, command: Command) extends Response
+  case class InsufficientFunds(account: Account, command: Command, message: String) extends Response
 }
 
 class AccountActor(context: ActorContext[AccountActor.Command], account: Account)
@@ -60,7 +60,7 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
 
   private def p2p(command: P2PTransfer) = {
     hasEnoughBalance(command.amount) match {
-      case Left(_) => command.reply ! InsufficientFunds(account, command)
+      case Left(msg) => command.reply ! InsufficientFunds(account, command, msg)
       case Right(_) => {
         transactions = transactions :+ WithdrawTransaction(command.amount)
         command.destinationAccount.accountRef ! Deposit(command.amount)
@@ -70,7 +70,7 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
 
   private def withdraw(withdraw: Withdraw) = {
     hasEnoughBalance(withdraw.amount) match {
-      case Left(_) => withdraw.reply ! InsufficientFunds(account, withdraw)
+      case Left(msg) => withdraw.reply ! InsufficientFunds(account, withdraw, msg)
       case Right(_) => transactions = transactions :+ WithdrawTransaction(withdraw.amount)
     }
   }

@@ -134,7 +134,7 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
   }
 
   private def assertThatInsufficientFundsWasReceived(account: Account, command: AccountActor.Command) = {
-    probe.expectMessage(InsufficientFunds(account, command))
+    probe.expectMessage(InsufficientFunds(account, command, "Insufficient funds"))
   }
 
 }
