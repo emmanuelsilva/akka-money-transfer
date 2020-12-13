@@ -4,8 +4,6 @@ import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import br.com.emmanuel.moneytransfer.domain._
 
-import scala.collection.mutable.Seq
-
 object AccountActor {
 
   def apply(account: Account): Behavior[Command] = {
@@ -32,7 +30,7 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
 
   import AccountActor._
 
-  var transactions = Seq[Transaction]()
+  var transactions: Seq[Transaction] = Seq[Transaction]()
 
   override def onMessage(msg: Command): Behavior[Command] = {
     msg match {
@@ -47,10 +45,10 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
   }
 
   private def computeCurrentBalance(): BigDecimal = {
-    transactions.map(_ match {
+    transactions.map {
       case credit: CreditTransaction => credit.amount
       case debit: DebitTransaction => debit.amount * -1
-    }).sum
+    }.sum
   }
 
   private def hasEnoughBalance(debitAmount: BigDecimal): Either[String, BigDecimal] = {
@@ -58,24 +56,24 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
     Either.cond(currentBalance >= debitAmount, currentBalance, "Insufficient funds")
   }
 
-  private def p2p(command: P2PTransfer) = {
+  private def p2p(command: P2PTransfer): Unit = {
     hasEnoughBalance(command.amount) match {
       case Left(msg) => command.reply ! InsufficientFunds(account, command, msg)
       case Right(_) => {
-        transactions = transactions :+ WithdrawTransaction(command.amount)
+        transactions = transactions :+ WithdrawTransaction(account, command.amount)
         command.destinationAccount.accountRef ! Deposit(command.amount)
       }
     }
   }
 
-  private def withdraw(withdraw: Withdraw) = {
+  private def withdraw(withdraw: Withdraw): Unit = {
     hasEnoughBalance(withdraw.amount) match {
       case Left(msg) => withdraw.reply ! InsufficientFunds(account, withdraw, msg)
-      case Right(_) => transactions = transactions :+ WithdrawTransaction(withdraw.amount)
+      case Right(_) => transactions = transactions :+ WithdrawTransaction(account, withdraw.amount)
     }
   }
 
-  private def deposit(amount: BigDecimal) = {
-    transactions = transactions :+ DepositTransaction(amount)
+  private def deposit(amount: BigDecimal): Unit = {
+    transactions = transactions :+ DepositTransaction(account, amount)
   }
 }

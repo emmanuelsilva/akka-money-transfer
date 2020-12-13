@@ -5,7 +5,7 @@ import akka.actor.typed.{ActorRef, Scheduler}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.util.Timeout
-import br.com.emmanuel.moneytransfer.domain.Account
+import br.com.emmanuel.moneytransfer.domain.{Account, DepositTransaction}
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor._
 
@@ -13,13 +13,12 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-object AccountRoute extends HasAccountJsonSerializer {
+object AccountRoute extends HasJsonSerializer {
 
   def route(bankActor: ActorRef[BankActor.Command])(implicit scheduler: Scheduler,
                                                     executionContext: ExecutionContext) = rejectEmptyResponse {
     pathPrefix("accounts") {
       concat(
-
         pathEnd {
           concat(
             get {
@@ -41,9 +40,17 @@ object AccountRoute extends HasAccountJsonSerializer {
           )
         },
 
+        path(Segment / "deposit") { accountId =>
+          post {
+            entity(as[DepositTransaction]) { transaction => {
+              bankActor ! Deposit(transaction.amount, Account(accountId))
+              complete(StatusCodes.Created)
+            }}
+          }
+        },
+
         path(Segment / "balance") { accountId =>
           get {
-            println(s"requesting ${accountId}")
             implicit val timeout: Timeout = 5.seconds
 
             val account = Account(accountId)

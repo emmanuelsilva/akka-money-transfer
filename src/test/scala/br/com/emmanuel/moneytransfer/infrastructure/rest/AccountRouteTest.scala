@@ -1,13 +1,15 @@
 package br.com.emmanuel.moneytransfer.infrastructure.rest
 
+import akka.actor.Scheduler
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.{MessageEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.util.Timeout
-import br.com.emmanuel.moneytransfer.domain.Account
+import br.com.emmanuel.moneytransfer.domain.{Account, DepositTransaction}
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor._
 import org.scalatest.concurrent.ScalaFutures._
@@ -15,14 +17,29 @@ import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
 
 import scala.concurrent.duration.DurationInt
 
-class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRouteTest with Matchers with HasAccountJsonSerializer {
+class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRouteTest with Matchers with HasJsonSerializer {
 
   import akka.actor.typed.scaladsl.adapter._
-  implicit val typedSystem = system.toTyped
-  implicit val timeout = Timeout(500.milliseconds)
-  implicit val scheduler = system.scheduler
+  implicit val typedSystem: ActorSystem[Nothing] = system.toTyped
+  implicit val timeout: Timeout = Timeout(500.milliseconds)
+  implicit val scheduler: Scheduler = system.scheduler
 
   val testKit: ActorTestKit = ActorTestKit()
+
+  "post /accounts/123/deposit should deposit into the 123 balance's account" in {
+    val bankActor = testKit.spawn(BankActor())
+    val account = Account("123")
+    bankActor ! CreateAccount(account)
+    val depositTransaction = DepositTransaction(account, 100)
+    val depositPostEntity = Marshal(depositTransaction).to[MessageEntity].futureValue
+
+    val testedRoute = Post("/accounts/123/deposit", depositPostEntity) ~> AccountRoute.route(bankActor)
+
+    testedRoute ~> check {
+      status shouldEqual StatusCodes.Created
+      assertThatBalanceIs(bankActor, account, 100)
+    }
+  }
 
   "get /accounts/123/balance should return zero balance when there is no transactions" in {
     val bankActor = testKit.spawn(BankActor())
@@ -83,8 +100,17 @@ class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRo
     }
   }
 
+  private def assertThatBalanceIs(bankActor: ActorRef[Command], account: Account, expectedBalance: BigDecimal): Unit = {
+    val probe = testKit.createTestProbe[Response]
+    bankActor ! GetAccountBalance(account, probe.ref)
+    val accountBalanceMessage = probe.expectMessageType[AccountBalance]
+
+    accountBalanceMessage.account shouldBe account
+    accountBalanceMessage.balance shouldBe expectedBalance
+  }
+
   private def createMockAccounts(qtd: Int) = {
-    (1 to qtd).map(_.toString).map(i => Account(s"account-${i}")).toSeq
+    (1 to qtd).map(_.toString).map(i => Account(s"account-$i"))
   }
 
 }

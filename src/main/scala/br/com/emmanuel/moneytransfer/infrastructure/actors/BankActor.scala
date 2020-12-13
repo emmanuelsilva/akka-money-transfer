@@ -14,7 +14,8 @@ object BankActor {
   }
 
   sealed trait Command
-  case class Deposit(amount: BigDecimal, account: Account, reply: ActorRef[Response]) extends Command
+  case class Deposit(amount: BigDecimal, account: Account) extends Command
+  case class Withdraw(amount: BigDecimal, account: Account) extends Command
   case class CreateAccount(account: Account) extends Command
   case class GetAccounts(reply: ActorRef[Response]) extends Command
   case class GetAccountBalance(account: Account, reply: ActorRef[Response]) extends Command
@@ -36,11 +37,10 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
 
   override def onMessage(msg: Command): Behavior[Command] = {
     msg match {
-      case CreateAccount(account) => createAccount(account)
-      case GetAccounts(reply) => reply ! Accounts(accounts.keys.toSeq)
-      case command: GetAccountBalance => accountBalance(command)
-      case command: Deposit => deposit(command)
-
+      case CreateAccount(account)          => createAccount(account)
+      case GetAccounts(reply)              => reply ! Accounts(accounts.keys.toSeq)
+      case command: GetAccountBalance      => accountBalance(command)
+      case command: Deposit                => deposit(command)
       case wrapped: WrappedAccountResponse =>
         wrapped.response match {
           case balance: AccountActor.Balance =>
@@ -59,7 +59,6 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
   private def deposit(deposit: Deposit): Unit = {
     accounts.get(deposit.account) match {
       case Some(accountActorRef) => accountActorRef ! AccountActor.Deposit(deposit.amount)
-      case None => deposit.reply ! AccountNotFound(deposit.account)
     }
   }
 
