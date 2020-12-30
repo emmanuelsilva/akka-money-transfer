@@ -14,8 +14,10 @@ object BankActor {
   }
 
   sealed trait Command
-  case class Deposit(amount: BigDecimal, account: Account) extends Command
+  case class Deposit(amount: BigDecimal, account: Account, reply: ActorRef[Response]) extends Command
   case class Withdraw(amount: BigDecimal, account: Account) extends Command
+  case class P2P(source: Account, target: Account, amount: BigDecimal) extends Command
+
   case class CreateAccount(account: Account) extends Command
   case class GetAccounts(reply: ActorRef[Response]) extends Command
   case class GetAccountBalance(account: Account, reply: ActorRef[Response]) extends Command
@@ -24,6 +26,7 @@ object BankActor {
   case class Accounts(accounts: immutable.Seq[Account]) extends Response
   case class AccountNotFound(account: Account) extends Response
   case class AccountBalance(account: Account, balance: BigDecimal) extends Response
+  case class DepositConfirmed() extends Response
 
   sealed trait WrappedMessage extends Command
   private case class WrappedAccountResponse(response: AccountActor.Response, reply: ActorRef[Response]) extends WrappedMessage
@@ -39,12 +42,12 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
     msg match {
       case CreateAccount(account)          => createAccount(account)
       case GetAccounts(reply)              => reply ! Accounts(accounts.keys.toSeq)
-      case command: GetAccountBalance      => accountBalance(command)
-      case command: Deposit                => deposit(command)
+      case command: GetAccountBalance      => requestAccountBalance(command)
+      case command: Deposit                => requestDeposit(command)
       case wrapped: WrappedAccountResponse =>
         wrapped.response match {
-          case balance: AccountActor.Balance =>
-            wrapped.reply ! AccountBalance(balance.account, balance.amount)
+          case balance: AccountActor.Balance   => wrapped.reply ! AccountBalance(balance.account, balance.amount)
+          case AccountActor.DepositConfirmed() => wrapped.reply ! DepositConfirmed()
         }
     }
 
@@ -56,19 +59,25 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
     accounts += account -> accountActorRef
   }
 
-  private def deposit(deposit: Deposit): Unit = {
+  private def requestDeposit(deposit: Deposit): Unit = {
+
+    val buildAccountResponseMapper = context.messageAdapter {
+      response => WrappedAccountResponse(response, deposit.reply)
+    }
+
     accounts.get(deposit.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountActor.Deposit(deposit.amount)
+      case Some(accountActorRef) => accountActorRef ! AccountActor.Deposit(deposit.amount, buildAccountResponseMapper)
+      case None                  => deposit.reply ! AccountNotFound(deposit.account)
     }
   }
 
-  private def accountBalance(getAccountBalance: GetAccountBalance): Unit = {
-    val accountResponseMapper: ActorRef[AccountActor.Response] = context.messageAdapter {
+  private def requestAccountBalance(getAccountBalance: GetAccountBalance): Unit = {
+    val buildAccountResponseMapper = context.messageAdapter {
       response => WrappedAccountResponse(response, getAccountBalance.reply)
     }
 
     accounts.get(getAccountBalance.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountActor.GetBalance(accountResponseMapper)
+      case Some(accountActorRef) => accountActorRef ! AccountActor.GetBalance(buildAccountResponseMapper)
       case None => getAccountBalance.reply ! AccountNotFound(getAccountBalance.account)
     }
   }

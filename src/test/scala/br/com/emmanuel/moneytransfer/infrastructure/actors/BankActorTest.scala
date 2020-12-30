@@ -31,12 +31,15 @@ class BankActorTest extends WordSpecLike with BeforeAndAfter with Matchers {
     assert(getAccountsResponse.accounts.contains(account))
   }
 
-  "should return 100 in the account balance after deposit 100" in {
+  "should return 100 after deposit 100" in {
     val bankActor = testKit.spawn(BankActor())
     val account = Account("123")
 
     bankActor ! CreateAccount(account)
-    bankActor ! Deposit(100, account)
+
+    bankActor ! Deposit(100, account, probe.ref)
+    probe.expectMessage(DepositConfirmed())
+
     bankActor ! GetAccountBalance(account, probe.ref)
 
     val accountBalance = probe.expectMessageType[AccountBalance]

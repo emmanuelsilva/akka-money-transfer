@@ -22,56 +22,27 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
     val account = Account("123")
     val accountActor = createAccountActor(account)
 
-    accountActor ! Deposit(100)
-    accountActor ! Deposit(50)
+    accountActor ! Deposit(100, probe.ref)
+    probe.expectMessage(DepositConfirmed())
+
+    accountActor ! Deposit(50, probe.ref)
+    probe.expectMessage(DepositConfirmed())
+
     accountActor ! Withdraw(50, probe.ref)
+
     accountActor ! GetTransactions(probe.ref)
 
     val transactions = probe.expectMessageType[Transactions]
     assertResult(3)(transactions.transactions.size)
   }
 
-  "should return insufficient funds when there is not balance to create P2P transfer" in {
-    val sourceAccount = Account("123")
-    val sourceAccountActor = createAccountActor(sourceAccount)
-
-    val destinationAccount = Account("456")
-    val destinationAccountActor = createAccountActor(destinationAccount)
-
-    val p2pTransferCommand = P2PTransfer(100, AccountWithRef(destinationAccount, destinationAccountActor), probe.ref)
-    sourceAccountActor ! p2pTransferCommand
-
-    assertThatInsufficientFundsWasReceived(sourceAccount, p2pTransferCommand)
-
-    sourceAccountActor ! GetBalance(probe.ref)
-    assertThatBalanceForAccountIs(sourceAccount, 0)
-
-    destinationAccountActor ! GetBalance(probe.ref)
-    assertThatBalanceForAccountIs(destinationAccount, 0)
-  }
-
-  "should transfer 100 from account 123 to account 456" in {
-    val sourceAccount = Account("123")
-    val sourceAccountActor = createAccountActor(sourceAccount)
-
-    val destinationAccount = Account("456")
-    val destinationAccountActor = createAccountActor(destinationAccount)
-
-    sourceAccountActor ! Deposit(100)
-    sourceAccountActor ! P2PTransfer(100, AccountWithRef(destinationAccount, destinationAccountActor), probe.ref)
-
-    sourceAccountActor ! GetBalance(probe.ref)
-    assertThatBalanceForAccountIs(sourceAccount, 0)
-
-    destinationAccountActor ! GetBalance(probe.ref)
-    assertThatBalanceForAccountIs(destinationAccount, 100)
-  }
-
-  "should deposit 100, withdraw 100 and the balance is zero" in {
+  "deposit 100, withdraw 100 and the balance should be zero" in {
     val account = Account("123")
     val accountActor = createAccountActor(account)
 
-    accountActor ! Deposit(100)
+    accountActor ! Deposit(100, probe.ref)
+    probe.expectMessage(DepositConfirmed())
+
     accountActor ! Withdraw(100, probe.ref)
 
     accountActor ! GetBalance(probe.ref)
@@ -88,17 +59,18 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
     assertThatInsufficientFundsWasReceived(account, withdrawCommand)
   }
 
-  "should deposit 100 and change balance amount to 100" in {
+  "deposit 100 and balance amount should be 100" in {
     val account = Account("123")
     val accountActor = createAccountActor(account)
 
-    accountActor ! Deposit(100)
-    accountActor ! GetBalance(probe.ref)
+    accountActor ! Deposit(100, probe.ref)
+    probe.expectMessage(DepositConfirmed())
 
+    accountActor ! GetBalance(probe.ref)
     assertThatBalanceForAccountIs(account, 100)
   }
 
-  "should receive 1000 deposits and change balance amount to 100000" in {
+  "receive 1000 deposits and balance amount should be 100000" in {
     val account = Account("123")
     val accountActor = createAccountActor(account)
     val depositAmount = 100
@@ -106,7 +78,8 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
     val expectedFinalAmount = depositAmount * depositQuantity
 
     for (_ <- 1 to depositQuantity) {
-      accountActor ! AccountActor.Deposit(depositAmount)
+      accountActor ! AccountActor.Deposit(depositAmount, probe.ref)
+      probe.expectMessage(DepositConfirmed())
     }
 
     accountActor ! AccountActor.GetBalance(probe.ref)

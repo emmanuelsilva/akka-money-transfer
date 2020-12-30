@@ -43,8 +43,22 @@ object AccountRoute extends HasJsonSerializer {
         path(Segment / "deposit") { accountId =>
           post {
             entity(as[DepositTransaction]) { transaction => {
-              bankActor ! Deposit(transaction.amount, Account(accountId))
-              complete(StatusCodes.Created)
+              implicit val timeout: Timeout = 5.seconds
+              val depositConfirmation = bankActor.ask(ref => Deposit(transaction.amount, Account(accountId), ref))
+
+              onComplete(depositConfirmation) {
+                case Success(response) =>
+                  response match {
+                    case DepositConfirmed() =>
+                      complete(StatusCodes.Created)
+                    case AccountNotFound(account) =>
+                      complete(StatusCodes.NotFound, s"account ${account.id} not found")
+                    case _ =>
+                      complete(StatusCodes.InternalServerError)
+                  }
+                case Failure(exception) =>
+                  complete(StatusCodes.InternalServerError, s"error: ${exception.getMessage}")
+              }
             }}
           }
         },

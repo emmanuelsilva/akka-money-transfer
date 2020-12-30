@@ -26,6 +26,20 @@ class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRo
 
   val testKit: ActorTestKit = ActorTestKit()
 
+  "deposit into non existent account should return 404" in {
+    val bankActor = testKit.spawn(BankActor())
+    val account = Account("123")
+
+    val depositTransaction = DepositTransaction(account, 100)
+    val depositPostEntity = Marshal(depositTransaction).to[MessageEntity].futureValue
+
+    val testedRoute = Post("/accounts/123/deposit", depositPostEntity) ~> AccountRoute.route(bankActor)
+
+    testedRoute ~> check {
+      status shouldEqual StatusCodes.NotFound
+    }
+  }
+
   "post /accounts/123/deposit should deposit into the 123 balance's account" in {
     val bankActor = testKit.spawn(BankActor())
     val account = Account("123")
