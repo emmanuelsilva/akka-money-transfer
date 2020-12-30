@@ -26,6 +26,41 @@ class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRo
 
   val testKit: ActorTestKit = ActorTestKit()
 
+  "post /accounts/123/withdraw withdraw with non-existent account should return not found" in {
+    val bankActor = testKit.spawn(BankActor())
+    val probe = testKit.createTestProbe[Response]
+
+    val account = Account("123")
+    val withdrawTransaction = WithdrawTransaction(account, 500)
+    val withdrawPostEntity = Marshal(withdrawTransaction).to[MessageEntity].futureValue
+
+    val testedRoute = Post("/accounts/123/withdraw", withdrawPostEntity) ~> AccountRoute.route(bankActor)
+
+    testedRoute ~> check {
+      status shouldEqual StatusCodes.NotFound
+    }
+  }
+
+  "post /accounts/123/withdraw withdraw with non-available balance should return bad request" in {
+    val bankActor = testKit.spawn(BankActor())
+    val probe = testKit.createTestProbe[Response]
+
+    val account = Account("123")
+
+    bankActor ! CreateAccount(account)
+    bankActor ! Deposit(100, account, probe.ref)
+
+    val withdrawTransaction = WithdrawTransaction(account, 500)
+    val withdrawPostEntity = Marshal(withdrawTransaction).to[MessageEntity].futureValue
+
+    val testedRoute = Post("/accounts/123/withdraw", withdrawPostEntity) ~> AccountRoute.route(bankActor)
+
+    testedRoute ~> check {
+      status shouldEqual StatusCodes.BadRequest
+      assertThatBalanceIs(bankActor, account, 100)
+    }
+  }
+
   "post /accounts/123/withdraw should withdraw from the 123 balance's account" in {
     val bankActor = testKit.spawn(BankActor())
     val probe = testKit.createTestProbe[Response]
