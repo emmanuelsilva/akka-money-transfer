@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{MessageEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.util.Timeout
-import br.com.emmanuel.moneytransfer.domain.{Account, DepositTransaction}
+import br.com.emmanuel.moneytransfer.domain.{Account, DepositTransaction, WithdrawTransaction}
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor._
 import org.scalatest.concurrent.ScalaFutures._
@@ -25,6 +25,26 @@ class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRo
   implicit val scheduler: Scheduler = system.scheduler
 
   val testKit: ActorTestKit = ActorTestKit()
+
+  "post /accounts/123/withdraw should withdraw from the 123 balance's account" in {
+    val bankActor = testKit.spawn(BankActor())
+    val probe = testKit.createTestProbe[Response]
+
+    val account = Account("123")
+
+    bankActor ! CreateAccount(account)
+    bankActor ! Deposit(100, account, probe.ref)
+
+    val withdrawTransaction = WithdrawTransaction(account, 50)
+    val withdrawPostEntity = Marshal(withdrawTransaction).to[MessageEntity].futureValue
+
+    val testedRoute = Post("/accounts/123/withdraw", withdrawPostEntity) ~> AccountRoute.route(bankActor)
+
+    testedRoute ~> check {
+      status shouldEqual StatusCodes.OK
+      assertThatBalanceIs(bankActor, account, 50)
+    }
+  }
 
   "deposit into non existent account should return 404" in {
     val bankActor = testKit.spawn(BankActor())

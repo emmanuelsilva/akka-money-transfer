@@ -5,7 +5,7 @@ import akka.actor.typed.{ActorRef, Scheduler}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.util.Timeout
-import br.com.emmanuel.moneytransfer.domain.{Account, DepositTransaction}
+import br.com.emmanuel.moneytransfer.domain.{Account, DepositTransaction, WithdrawTransaction}
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor._
 
@@ -27,7 +27,7 @@ object AccountRoute extends HasJsonSerializer {
 
               onComplete(futureAccounts) {
                 case Success(getAccounts) => complete(Option(getAccounts).filter(_.accounts.nonEmpty))
-                case Failure(exception) => complete(StatusCodes.InternalServerError, s"error: ${exception.getMessage}")
+                case Failure(exception)   => complete(StatusCodes.InternalServerError, s"error: ${exception.getMessage}")
               }
             },
 
@@ -44,17 +44,35 @@ object AccountRoute extends HasJsonSerializer {
           post {
             entity(as[DepositTransaction]) { transaction => {
               implicit val timeout: Timeout = 5.seconds
-              val depositConfirmation = bankActor.ask(ref => Deposit(transaction.amount, Account(accountId), ref))
+              val depositRequest = bankActor.ask(ref => Deposit(transaction.amount, Account(accountId), ref))
 
-              onComplete(depositConfirmation) {
-                case Success(response) =>
-                  response match {
-                    case DepositConfirmed() =>
-                      complete(StatusCodes.Created)
-                    case AccountNotFound(account) =>
-                      complete(StatusCodes.NotFound, s"account ${account.id} not found")
-                    case _ =>
-                      complete(StatusCodes.InternalServerError)
+              onComplete(depositRequest) {
+                case Success(depositConfirmation) =>
+                  depositConfirmation match {
+                    case DepositConfirmed()       => complete(StatusCodes.Created)
+                    case AccountNotFound(account) => complete(StatusCodes.NotFound, s"account ${account.id} not found")
+                    case _                        => complete(StatusCodes.InternalServerError)
+                  }
+                case Failure(exception) =>
+                  complete(StatusCodes.InternalServerError, s"error: ${exception.getMessage}")
+              }
+            }}
+          }
+        },
+
+        path(Segment / "withdraw") { accountId =>
+          post {
+            entity(as[WithdrawTransaction]) { transaction => {
+              implicit val timeout: Timeout = 5.seconds
+              val withdrawRequest = bankActor.ask(ref => Withdraw(transaction.amount, Account(accountId), ref))
+
+              onComplete(withdrawRequest) {
+                case Success(withdrawConfirmation) =>
+                  withdrawConfirmation match {
+                    case WithdrawConfirmed()      => complete(StatusCodes.OK)
+                    case AccountNotFound(account) => complete(StatusCodes.NotFound, s"account ${account.id} not found")
+                    case InsufficientFounds(msg)  => complete(StatusCodes.BadRequest, msg)
+                    case _                        => complete(StatusCodes.InternalServerError)
                   }
                 case Failure(exception) =>
                   complete(StatusCodes.InternalServerError, s"error: ${exception.getMessage}")
@@ -74,7 +92,7 @@ object AccountRoute extends HasJsonSerializer {
 
             onComplete(getAccountBalance) {
               case Success(accountBalance) => complete(Option(accountBalance))
-              case Failure(exception) => complete(StatusCodes.InternalServerError, s"error: ${exception.getMessage}")
+              case Failure(exception)      => complete(StatusCodes.InternalServerError, s"error: ${exception.getMessage}")
             }
           }
         }
