@@ -29,14 +29,14 @@ object BankActor {
   case class InsufficientFounds(msg: String) extends Response
 
   sealed trait WrappedMessage extends Command
-  private case class WrappedAccountResponse(response: AccountActor.Response, reply: ActorRef[Response]) extends WrappedMessage
+  private case class WrappedAccountResponse(response: AccountLedgerActor.Response, reply: ActorRef[Response]) extends WrappedMessage
 }
 
 class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavior[Command](context) {
 
   import BankActor._
 
-  var accounts: Map[Account, ActorRef[AccountActor.Command]] = Map[Account, ActorRef[AccountActor.Command]]()
+  var accounts: Map[Account, ActorRef[AccountLedgerActor.Command]] = Map[Account, ActorRef[AccountLedgerActor.Command]]()
 
   override def onMessage(msg: Command): Behavior[Command] = {
     msg match {
@@ -47,13 +47,13 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
       case command: Withdraw               => requestWithdraw(command)
       case wrapped: WrappedAccountResponse =>
         wrapped.response match {
-          case balance: AccountActor.Balance =>
+          case balance: AccountLedgerActor.Balance =>
             wrapped.reply ! AccountBalance(balance.account, balance.amount)
-          case AccountActor.DepositConfirmed() =>
+          case AccountLedgerActor.DepositConfirmed() =>
             wrapped.reply ! DepositConfirmed()
-          case AccountActor.WithdrawConfirmed() =>
+          case AccountLedgerActor.WithdrawConfirmed() =>
             wrapped.reply ! WithdrawConfirmed()
-          case AccountActor.InsufficientFunds(_, _, msg) =>
+          case AccountLedgerActor.InsufficientFunds(_, _, msg) =>
             wrapped.reply ! InsufficientFounds(msg)
         }
     }
@@ -62,7 +62,7 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
   }
 
   private def createAccount(account: Account): Unit = {
-    val accountActorRef = context.spawn(AccountActor(account), account.id)
+    val accountActorRef = context.spawn(AccountLedgerActor(account), account.id)
     accounts += account -> accountActorRef
   }
 
@@ -72,8 +72,8 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
     }
 
     accounts.get(command.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountActor.Deposit(command.amount, buildAccountResponseMapper)
-      case None                  => command.reply ! AccountNotFound(command.account)
+      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.Deposit(command.amount, buildAccountResponseMapper)
+      case None => command.reply ! AccountNotFound(command.account)
     }
   }
 
@@ -83,8 +83,8 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
     }
 
     accounts.get(command.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountActor.Withdraw(command.amount, buildAccountResponseMapper)
-      case None                  => command.reply ! AccountNotFound(command.account)
+      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.Withdraw(command.amount, buildAccountResponseMapper)
+      case None => command.reply ! AccountNotFound(command.account)
     }
   }
 
@@ -94,7 +94,7 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
     }
 
     accounts.get(getAccountBalance.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountActor.GetBalance(buildAccountResponseMapper)
+      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.GetBalance(buildAccountResponseMapper)
       case None => getAccountBalance.reply ! AccountNotFound(getAccountBalance.account)
     }
   }

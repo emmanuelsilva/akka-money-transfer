@@ -4,10 +4,10 @@ import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import br.com.emmanuel.moneytransfer.domain._
 
-object AccountActor {
+object AccountLedgerActor {
 
   def apply(account: Account): Behavior[Command] = {
-    Behaviors.setup(context => new AccountActor(context, account))
+    Behaviors.setup(context => new AccountLedgerActor(context, account))
   }
 
   final case class AccountWithRef(account: Account, accountRef: ActorRef[Command])
@@ -26,10 +26,10 @@ object AccountActor {
   case class WithdrawConfirmed() extends Response
 }
 
-class AccountActor(context: ActorContext[AccountActor.Command], account: Account)
-  extends AbstractBehavior[AccountActor.Command](context) {
+class AccountLedgerActor(context: ActorContext[AccountLedgerActor.Command], account: Account)
+  extends AbstractBehavior[AccountLedgerActor.Command](context) {
 
-  import AccountActor._
+  import AccountLedgerActor._
 
   var transactions: Seq[Transaction] = Seq[Transaction]()
 
@@ -59,10 +59,9 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
   private def withdraw(command: Withdraw): Unit = {
     hasEnoughBalance(command.amount) match {
       case Left(msg) => command.reply ! InsufficientFunds(account, command, msg)
-      case Right(_) => {
+      case Right(_) =>
         transactions = transactions :+ WithdrawTransaction(account, command.amount)
         command.reply ! WithdrawConfirmed()
-      }
     }
   }
 

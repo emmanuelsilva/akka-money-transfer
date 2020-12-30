@@ -2,13 +2,13 @@ package br.com.emmanuel.moneytransfer.infrastructure.actors
 
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
 import br.com.emmanuel.moneytransfer.domain.Account
-import br.com.emmanuel.moneytransfer.infrastructure.actors.AccountActor._
+import br.com.emmanuel.moneytransfer.infrastructure.actors.AccountLedgerActor._
 import org.scalatest.{BeforeAndAfter, WordSpecLike}
 
-class AccountActorTest extends WordSpecLike with BeforeAndAfter {
+class AccountLedgerActorTest extends WordSpecLike with BeforeAndAfter {
 
   val testKit: ActorTestKit = ActorTestKit()
-  var probe: TestProbe[AccountActor.Response] = null
+  var probe: TestProbe[AccountLedgerActor.Response] = null
 
   before {
     probe = createAccountResponseProbe
@@ -79,11 +79,11 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
     val expectedFinalAmount = depositAmount * depositQuantity
 
     for (_ <- 1 to depositQuantity) {
-      accountActor ! AccountActor.Deposit(depositAmount, probe.ref)
+      accountActor ! AccountLedgerActor.Deposit(depositAmount, probe.ref)
       probe.expectMessage(DepositConfirmed())
     }
 
-    accountActor ! AccountActor.GetBalance(probe.ref)
+    accountActor ! AccountLedgerActor.GetBalance(probe.ref)
     assertThatBalanceForAccountIs(account, expectedFinalAmount)
   }
 
@@ -91,23 +91,23 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
     val account = Account("123")
     val accountActor = createAccountActor(account)
 
-    accountActor ! AccountActor.GetBalance(probe.ref)
+    accountActor ! AccountLedgerActor.GetBalance(probe.ref)
     assertThatBalanceForAccountIs(account, 0)
   }
 
   private def createAccountActor(account: Account) =
-    testKit.spawn(AccountActor(account))
+    testKit.spawn(AccountLedgerActor(account))
 
 
   private def createAccountResponseProbe =
-    testKit.createTestProbe[AccountActor.Response]()
+    testKit.createTestProbe[AccountLedgerActor.Response]()
 
 
   private def assertThatBalanceForAccountIs(account: Account, expectedAmount: BigDecimal): Unit = {
     probe.expectMessage(Balance(account, expectedAmount))
   }
 
-  private def assertThatInsufficientFundsWasReceived(account: Account, command: AccountActor.Command) = {
+  private def assertThatInsufficientFundsWasReceived(account: Account, command: AccountLedgerActor.Command) = {
     probe.expectMessage(InsufficientFunds(account, command, "Insufficient funds"))
   }
 
