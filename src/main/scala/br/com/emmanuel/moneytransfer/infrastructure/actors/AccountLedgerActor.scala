@@ -10,8 +10,6 @@ object AccountLedgerActor {
     Behaviors.setup(context => new AccountLedgerActor(context, account))
   }
 
-  final case class AccountWithRef(account: Account, accountRef: ActorRef[Command])
-
   sealed trait Command
   case class Deposit(amount: BigDecimal, reply: ActorRef[Response]) extends Command
   case class Withdraw(amount: BigDecimal, reply: ActorRef[Response]) extends Command
