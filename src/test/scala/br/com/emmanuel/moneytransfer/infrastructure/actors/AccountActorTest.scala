@@ -29,9 +29,9 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
     probe.expectMessage(DepositConfirmed())
 
     accountActor ! Withdraw(50, probe.ref)
+    probe.expectMessage(WithdrawConfirmed())
 
     accountActor ! GetTransactions(probe.ref)
-
     val transactions = probe.expectMessageType[Transactions]
     assertResult(3)(transactions.transactions.size)
   }
@@ -44,6 +44,7 @@ class AccountActorTest extends WordSpecLike with BeforeAndAfter {
     probe.expectMessage(DepositConfirmed())
 
     accountActor ! Withdraw(100, probe.ref)
+    probe.expectMessage(WithdrawConfirmed())
 
     accountActor ! GetBalance(probe.ref)
     assertThatBalanceForAccountIs(account, 0)

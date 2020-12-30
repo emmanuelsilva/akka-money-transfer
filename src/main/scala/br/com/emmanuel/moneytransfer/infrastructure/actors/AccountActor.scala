@@ -23,6 +23,7 @@ object AccountActor {
   case class Transactions(account: Account, transactions: Seq[Transaction]) extends Response
   case class InsufficientFunds(account: Account, command: Command, message: String) extends Response
   case class DepositConfirmed() extends Response
+  case class WithdrawConfirmed() extends Response
 }
 
 class AccountActor(context: ActorContext[AccountActor.Command], account: Account)
@@ -52,7 +53,7 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
 
   private def hasEnoughBalance(debitAmount: BigDecimal): Either[String, BigDecimal] = {
     val currentBalance = computeCurrentBalance()
-    Either.cond(currentBalance >= debitAmount, currentBalance, "Insufficient funds")
+    Either.cond(currentBalance >= debitAmount, currentBalance, "Can't complete the withdraw due to insufficient funds")
   }
 
   private def withdraw(command: Withdraw): Unit = {
@@ -60,6 +61,7 @@ class AccountActor(context: ActorContext[AccountActor.Command], account: Account
       case Left(msg) => command.reply ! InsufficientFunds(account, command, msg)
       case Right(_) => {
         transactions = transactions :+ WithdrawTransaction(account, command.amount)
+        command.reply ! WithdrawConfirmed()
       }
     }
   }

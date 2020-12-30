@@ -26,7 +26,6 @@ class BankActorTest extends WordSpecLike with BeforeAndAfter with Matchers {
     bankActor ! GetAccounts(probe.ref)
 
     val getAccountsResponse = probe.expectMessageType[Accounts]
-
     assertResult(1)(getAccountsResponse.accounts.size)
     assert(getAccountsResponse.accounts.contains(account))
   }
@@ -36,15 +35,41 @@ class BankActorTest extends WordSpecLike with BeforeAndAfter with Matchers {
     val account = Account("123")
 
     bankActor ! CreateAccount(account)
-
     bankActor ! Deposit(100, account, probe.ref)
-    probe.expectMessage(DepositConfirmed())
-
     bankActor ! GetAccountBalance(account, probe.ref)
 
-    val accountBalance = probe.expectMessageType[AccountBalance]
-    accountBalance.account shouldBe account
-    accountBalance.balance shouldBe 100
+    probe.expectMessage(DepositConfirmed())
+    probe.expectMessage(AccountBalance(account, 100))
+  }
+
+  "should confirm the withdraw if there's available balance" in {
+    val bankActor = testKit.spawn(BankActor())
+    val account = Account("123")
+
+    bankActor ! CreateAccount(account)
+    bankActor ! Deposit(100, account, probe.ref)
+    bankActor ! Withdraw(50, account, probe.ref)
+
+    probe.expectMessage(DepositConfirmed())
+    probe.expectMessage(WithdrawConfirmed())
+
+    bankActor ! GetAccountBalance(account, probe.ref)
+    probe.expectMessage(AccountBalance(account, 50))
+  }
+
+  "should dont confirm the withdraw when there's no sufficient funds in the balance" in {
+    val bankActor = testKit.spawn(BankActor())
+    val account = Account("123")
+
+    bankActor ! CreateAccount(account)
+    bankActor ! Deposit(100, account, probe.ref)
+    bankActor ! Withdraw(500, account, probe.ref)
+
+    probe.expectMessage(DepositConfirmed())
+    probe.expectMessage(InsufficientFounds("Can't complete the withdraw due to insufficient funds"))
+
+    bankActor ! GetAccountBalance(account, probe.ref)
+    probe.expectMessage(AccountBalance(account, 100))
   }
 
   private def createBankResponseProbe =
