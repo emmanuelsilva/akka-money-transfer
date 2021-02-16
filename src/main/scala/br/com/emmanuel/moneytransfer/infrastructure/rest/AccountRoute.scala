@@ -71,7 +71,7 @@ object AccountRoute extends HasJsonSerializer {
                   withdrawConfirmation match {
                     case WithdrawConfirmed()      => complete(StatusCodes.OK)
                     case AccountNotFound(account) => complete(StatusCodes.NotFound, s"account ${account.id} not found")
-                    case InsufficientFounds(msg)  => complete(StatusCodes.BadRequest, msg)
+                    case InsufficientFunds(msg)  => complete(StatusCodes.BadRequest, msg)
                     case _                        => complete(StatusCodes.InternalServerError)
                   }
                 case Failure(exception) =>

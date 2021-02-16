@@ -16,6 +16,7 @@ object BankActor {
   sealed trait Command
   case class Deposit(amount: BigDecimal, account: Account, reply: ActorRef[Response]) extends Command
   case class Withdraw(amount: BigDecimal, account: Account, reply: ActorRef[Response]) extends Command
+  case class P2P(amount: BigDecimal, from: Account, to: Account, reply: ActorRef[Response]) extends Command
   case class CreateAccount(account: Account) extends Command
   case class GetAccounts(reply: ActorRef[Response]) extends Command
   case class GetAccountBalance(account: Account, reply: ActorRef[Response]) extends Command
@@ -26,10 +27,13 @@ object BankActor {
   case class AccountBalance(account: Account, balance: BigDecimal) extends Response
   case class DepositConfirmed() extends Response
   case class WithdrawConfirmed() extends Response
-  case class InsufficientFounds(msg: String) extends Response
+  case class P2PConfirmed() extends Response
+  case class P2PFailed() extends Response
+  case class InsufficientFunds(msg: String) extends Response
 
   sealed trait WrappedMessage extends Command
   private case class WrappedAccountResponse(response: AccountLedgerActor.Response, reply: ActorRef[Response]) extends WrappedMessage
+  private case class WrappedP2PResponse(response: AccountLedgerActor.Response, command: P2P) extends WrappedMessage
 }
 
 class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavior[Command](context) {
@@ -45,6 +49,16 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
       case command: GetAccountBalance      => requestAccountBalance(command)
       case command: Deposit                => requestDeposit(command)
       case command: Withdraw               => requestWithdraw(command)
+      case command: P2P                    => withdrawFromOriginAccount(command)
+      case p2pResponse: WrappedP2PResponse =>
+        p2pResponse.response match {
+          case AccountLedgerActor.InsufficientFunds(_, _, msg) =>
+            p2pResponse.command.reply ! P2PFailed()
+          case AccountLedgerActor.WithdrawConfirmed() =>
+            depositIntoDestinationAccount(p2pResponse.command)
+          case AccountLedgerActor.DepositConfirmed() =>
+            p2pResponse.command.reply ! P2PConfirmed()
+        }
       case wrapped: WrappedAccountResponse =>
         wrapped.response match {
           case balance: AccountLedgerActor.Balance =>
@@ -54,7 +68,7 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
           case AccountLedgerActor.WithdrawConfirmed() =>
             wrapped.reply ! WithdrawConfirmed()
           case AccountLedgerActor.InsufficientFunds(_, _, msg) =>
-            wrapped.reply ! InsufficientFounds(msg)
+            wrapped.reply ! InsufficientFunds(msg)
         }
     }
 
@@ -96,6 +110,33 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
     accounts.get(getAccountBalance.account) match {
       case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.GetBalance(buildAccountResponseMapper)
       case None => getAccountBalance.reply ! AccountNotFound(getAccountBalance.account)
+    }
+  }
+
+  private def withdrawFromOriginAccount(p2p: P2P): Unit = {
+    val buildAccountResponseMapper = context.messageAdapter {
+      response => WrappedP2PResponse(response, p2p)
+    }
+
+    accounts.get(p2p.to) match {
+      case Some(_) => println("Destination account found")
+      case None    => p2p.reply ! AccountNotFound(p2p.to)
+    }
+
+    accounts.get(p2p.from) match {
+      case Some(fromActorRef) => fromActorRef ! AccountLedgerActor.Withdraw(p2p.amount, buildAccountResponseMapper)
+      case None => p2p.reply ! AccountNotFound(p2p.from)
+    }
+  }
+
+  private def depositIntoDestinationAccount(command: P2P): Unit = {
+    val buildAccountResponseMapper = context.messageAdapter {
+      response => WrappedP2PResponse(response, command)
+    }
+
+    accounts.get(command.to) match {
+      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.Deposit(command.amount, buildAccountResponseMapper)
+      case None => command.reply ! AccountNotFound(command.to)
     }
   }
 }
