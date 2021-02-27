@@ -105,7 +105,7 @@ class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRo
     val testedRoute = Post("/accounts/123/deposit", depositPostEntity) ~> AccountRoute.route(bankActor)
 
     testedRoute ~> check {
-      status shouldEqual StatusCodes.Created
+      status shouldEqual StatusCodes.OK
       assertThatBalanceIs(bankActor, account, 100)
     }
   }

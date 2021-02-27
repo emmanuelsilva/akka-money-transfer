@@ -116,10 +116,6 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
   }
 
   private def requestAccountBalance(getAccountBalance: GetAccountBalance): Unit = {
-    val buildAccountResponseMapper = context.messageAdapter {
-      response => WrappedAccountResponse(response, getAccountBalance.reply)
-    }
-
     accounts.get(getAccountBalance.account) match {
       case Some(accountActorRef) =>
 

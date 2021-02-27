@@ -49,7 +49,7 @@ object AccountRoute extends HasJsonSerializer {
               onComplete(depositRequest) {
                 case Success(depositConfirmation) =>
                   depositConfirmation match {
-                    case DepositConfirmed()       => complete(StatusCodes.Created)
+                    case DepositConfirmed()       => complete(StatusCodes.OK)
                     case AccountNotFound(account) => complete(StatusCodes.NotFound, s"account ${account.id} not found")
                     case _                        => complete(StatusCodes.InternalServerError)
                   }
