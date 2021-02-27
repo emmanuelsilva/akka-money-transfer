@@ -26,5 +26,5 @@ Describe all endpoint API operations, and the respective contracts.
 * * *
 
 * Write unit test for each actor message
-* Write unit test for each exposed API endpoint
+* Write integration test for each exposed API endpoint
 * Scala 2.13 best practices  
