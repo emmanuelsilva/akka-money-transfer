@@ -19,3 +19,5 @@ libraryDependencies += "ch.qos.logback"    % "logback-classic" % "1.2.3"
 libraryDependencies += "org.scalatest"    %% "scalatest" % "3.0.8" % Test
 libraryDependencies += "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion % Test
 libraryDependencies += "com.typesafe.akka" %% "akka-http-testkit"        % akkaHttpVersion % Test
+
+mainClass in (Compile, run) := Some("br.com.emmanuel.moneytransfer.infrastructure.rest.HttpRestServer")
