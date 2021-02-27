@@ -2,10 +2,13 @@ package br.com.emmanuel.moneytransfer.infrastructure.actors
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.util.Timeout
 import br.com.emmanuel.moneytransfer.domain.Account
 import br.com.emmanuel.moneytransfer.infrastructure.actors.BankActor.Command
 
 import scala.collection.immutable
+import scala.concurrent.duration.DurationInt
+import scala.util.{Failure, Success}
 
 object BankActor {
 
@@ -30,6 +33,7 @@ object BankActor {
   case class P2PConfirmed() extends Response
   case class P2PFailed() extends Response
   case class InsufficientFunds(msg: String) extends Response
+  case class Failed() extends Response
 
   sealed trait WrappedMessage extends Command
   private case class WrappedAccountResponse(response: AccountLedgerActor.Response, reply: ActorRef[Response]) extends WrappedMessage
@@ -39,6 +43,7 @@ object BankActor {
 class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavior[Command](context) {
 
   import BankActor._
+  implicit val timeout: Timeout = Timeout(1.minute)
 
   var accounts: Map[Account, ActorRef[AccountLedgerActor.Command]] = Map[Account, ActorRef[AccountLedgerActor.Command]]()
 
@@ -52,12 +57,14 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
       case command: P2P                    => withdrawFromOriginAccount(command)
       case p2pResponse: WrappedP2PResponse =>
         p2pResponse.response match {
-          case AccountLedgerActor.InsufficientFunds(_, _, msg) =>
+          case AccountLedgerActor.InsufficientFunds(_, _, _) =>
             p2pResponse.command.reply ! P2PFailed()
           case AccountLedgerActor.WithdrawConfirmed() =>
             depositIntoDestinationAccount(p2pResponse.command)
           case AccountLedgerActor.DepositConfirmed() =>
             p2pResponse.command.reply ! P2PConfirmed()
+          case AccountLedgerActor.Failed() =>
+            p2pResponse.command.reply ! P2PFailed()
         }
       case wrapped: WrappedAccountResponse =>
         wrapped.response match {
@@ -69,10 +76,12 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
             wrapped.reply ! WithdrawConfirmed()
           case AccountLedgerActor.InsufficientFunds(_, _, msg) =>
             wrapped.reply ! InsufficientFunds(msg)
+          case AccountLedgerActor.Failed() =>
+            wrapped.reply ! Failed()
         }
     }
 
-    this
+    Behaviors.same
   }
 
   private def createAccount(account: Account): Unit = {
@@ -81,23 +90,27 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
   }
 
   private def requestDeposit(command: Deposit): Unit = {
-    val buildAccountResponseMapper = context.messageAdapter {
-      response => WrappedAccountResponse(response, command.reply)
-    }
-
     accounts.get(command.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.Deposit(command.amount, buildAccountResponseMapper)
+      case Some(accountActorRef) =>
+
+        context.ask(accountActorRef, ref => AccountLedgerActor.Deposit(command.amount, ref)) {
+          case Success(response) => WrappedAccountResponse(response, command.reply)
+          case Failure(_) => WrappedAccountResponse(AccountLedgerActor.Failed(), command.reply)
+        }
+
       case None => command.reply ! AccountNotFound(command.account)
     }
   }
 
   private def requestWithdraw(command: Withdraw): Unit = {
-    val buildAccountResponseMapper = context.messageAdapter {
-      response => WrappedAccountResponse(response, command.reply)
-    }
-
     accounts.get(command.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.Withdraw(command.amount, buildAccountResponseMapper)
+      case Some(accountActorRef) =>
+
+        context.ask(accountActorRef, ref => AccountLedgerActor.Withdraw(command.amount, ref)) {
+          case Success(response) => WrappedAccountResponse(response, command.reply)
+          case Failure(_) => WrappedAccountResponse(AccountLedgerActor.Failed(), command.reply)
+        }
+
       case None => command.reply ! AccountNotFound(command.account)
     }
   }
@@ -108,34 +121,42 @@ class BankActor(context: ActorContext[BankActor.Command]) extends AbstractBehavi
     }
 
     accounts.get(getAccountBalance.account) match {
-      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.GetBalance(buildAccountResponseMapper)
+      case Some(accountActorRef) =>
+
+        context.ask(accountActorRef, AccountLedgerActor.GetBalance) {
+          case Success(response) => WrappedAccountResponse(response, getAccountBalance.reply)
+          case Failure(_) => WrappedAccountResponse(AccountLedgerActor.Failed(), getAccountBalance.reply)
+        }
+
       case None => getAccountBalance.reply ! AccountNotFound(getAccountBalance.account)
     }
   }
 
   private def withdrawFromOriginAccount(p2p: P2P): Unit = {
-    val buildAccountResponseMapper = context.messageAdapter {
-      response => WrappedP2PResponse(response, p2p)
-    }
-
     accounts.get(p2p.to) match {
       case Some(_) => println("Destination account found")
       case None    => p2p.reply ! AccountNotFound(p2p.to)
     }
 
     accounts.get(p2p.from) match {
-      case Some(fromActorRef) => fromActorRef ! AccountLedgerActor.Withdraw(p2p.amount, buildAccountResponseMapper)
+      case Some(fromActorRef) =>
+        context.ask(fromActorRef, ref => AccountLedgerActor.Withdraw(p2p.amount, ref)) {
+          case Success(response) => WrappedP2PResponse(response, p2p)
+          case Failure(_) => WrappedP2PResponse(AccountLedgerActor.Failed(), p2p)
+        }
       case None => p2p.reply ! AccountNotFound(p2p.from)
     }
   }
 
   private def depositIntoDestinationAccount(command: P2P): Unit = {
-    val buildAccountResponseMapper = context.messageAdapter {
-      response => WrappedP2PResponse(response, command)
-    }
-
     accounts.get(command.to) match {
-      case Some(accountActorRef) => accountActorRef ! AccountLedgerActor.Deposit(command.amount, buildAccountResponseMapper)
+      case Some(accountActorRef) =>
+
+        context.ask(accountActorRef, ref => AccountLedgerActor.Deposit(command.amount, ref)) {
+          case Success(response) => WrappedP2PResponse(response, command)
+          case Failure(_) => WrappedP2PResponse(AccountLedgerActor.Failed(), command)
+        }
+
       case None => command.reply ! AccountNotFound(command.to)
     }
   }

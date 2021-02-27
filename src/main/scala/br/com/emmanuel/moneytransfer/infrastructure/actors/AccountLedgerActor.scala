@@ -22,6 +22,7 @@ object AccountLedgerActor {
   case class InsufficientFunds(account: Account, command: Command, message: String) extends Response
   case class DepositConfirmed() extends Response
   case class WithdrawConfirmed() extends Response
+  case class Failed() extends Response
 }
 
 class AccountLedgerActor(context: ActorContext[AccountLedgerActor.Command], account: Account)
