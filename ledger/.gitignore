@@ -1,0 +1,19 @@
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### SBT Files ###
+bin/
+project/target
+project/project
+build/
+target
+~
+
+### Mac ###
+.DS_Store
+
+### general ###
+*.class

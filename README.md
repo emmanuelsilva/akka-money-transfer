@@ -1,30 +1,39 @@
-# Bank Account using Akka + Scala
+# Reactive Bank Account (P2P transfer) using Akka + Scala + Kafka + Microservices
 
-Project to learn and put in practice a bank account backend where deposit, withdraw and p2p transfers operations are
-available using the actors model on top of akka and scala.
+Project to learn and put in practice some concepts such as the actors model, CQRS and asynchronous microservices by simulating a bank account which users can transfer money through P2P transactions.
 
-## Setup
+## Architecture & technical details
 * * *
 
-The project setup is based on the SBT tool.
+![Project Architecture](docs/architecture.png)
 
-- Test: `sbt test`
-- Run: `sbt run` to start the server on the 8080 port.
+Experimented technologies
 
-## Architecture and technical details
+- Akka
+- Scala
+- Kafka
+
+
+### Communication
+* * *
+The main objective is that all write messages exchanged by every microservice must be asynchronous. 
+
+The Kafka is used to make asynchronous communication possible and create an agnostic layer to isolate the technology chosen for each microservice from the external world.
+
+### Services
+
+#### Ledger
 * * *
 
-Describe the motivation to use actor model, describe the following layers: API, Bank actor model, Account actor model, 
-and all exchanged message.
+The ledger was written using the actors mode in order to simplify the concurrent model. That means every account is an actor who knows how to
+change your mutable state in a thread-safe way.
 
-## API
-* * *
 
-Describe all endpoint API operations, and the respective contracts.
- 
 ## Contribution guidelines
 * * *
 
 * Write unit test for each actor message
 * Write integration test for each exposed API endpoint
 * Scala 2.13 best practices  
+* Reactive principles
+* Be asynchronous
