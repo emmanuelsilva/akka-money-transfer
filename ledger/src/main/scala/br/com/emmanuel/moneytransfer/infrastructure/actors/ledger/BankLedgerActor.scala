@@ -30,8 +30,13 @@ class BankLedgerActor(context: ActorContext[Command]) extends AbstractBehavior[C
 
   private def createAccount(command: CreateAccount): Unit = {
     val account = command.account
-    val accountActorRef = context.spawn(AccountLedgerActor(account), account.id)
-    accounts += account -> accountActorRef
+
+    accounts.get(account) match {
+      case Some(_) => context.log.info(s"account ${account.id} already created")
+      case None    =>
+        val accountActorRef = context.spawn(AccountLedgerActor(account), account.id)
+        accounts += account -> accountActorRef
+    }
   }
 
   private def getAccounts(command: GetAccounts) = {
