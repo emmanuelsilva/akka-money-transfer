@@ -55,9 +55,9 @@ kubectl apply -n ledger -f kubernetes/service.yaml
 kubectl apply -n ledger -f kubernetes/ingress.yaml
 ```
 
-- Scale:
+- Scale in/out:
 ```shell
-kubectl scale deployments/ledger --replicas=2
+kubectl scale deployments/ledger --replicas=<desired-replicas>
 ```
 
 ### Akka cluster HTTP API
