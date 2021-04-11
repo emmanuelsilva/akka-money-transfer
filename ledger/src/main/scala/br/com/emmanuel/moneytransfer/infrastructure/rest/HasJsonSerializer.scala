@@ -1,8 +1,8 @@
 package br.com.emmanuel.moneytransfer.infrastructure.rest
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import br.com.emmanuel.moneytransfer.domain.ledger.BankLedgerProtocol.{Balance, Accounts}
-import br.com.emmanuel.moneytransfer.domain.ledger.{Account, CreditTransaction, DebitTransaction}
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor.CurrentBalance
+import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
 import spray.json.{DefaultJsonProtocol, JsString, JsValue, JsonFormat}
 
 import java.text.SimpleDateFormat
@@ -30,15 +30,13 @@ trait HasJsonSerializer extends SprayJsonSupport with DefaultJsonProtocol {
 
   import CalendarMarshalling._
 
-  implicit val accountJsonFormat = jsonFormat1(Account)
-  implicit val accountsJsonFormat = jsonFormat1(Accounts)
-  implicit val accountBalanceJsonFormat = jsonFormat2(Balance)
+  implicit val accountJsonFormat = jsonFormat1(AccountRequest)
+  implicit val currentBalanceJsonFormat = jsonFormat1(CurrentBalance)
 
-
-  implicit val creditTransactionJsonFormat = {
-    jsonFormat[String, String, Calendar, Account, BigDecimal, CreditTransaction](CreditTransaction, "id", "kind", "instant", "account", "amount")
+  implicit val creditTransactionRequestJsonFormat = {
+    jsonFormat[String, String, Calendar, BigDecimal, CreditTransactionRequest](CreditTransactionRequest, "id", "kind", "instant", "amount")
   }
 
-  implicit val debitTransactionJsonFormat =
-    jsonFormat[String, String, Calendar, Account, BigDecimal, DebitTransaction](DebitTransaction, "id", "kind", "instant", "account", "amount")
+  implicit val debitTransactionRequestJsonFormat =
+    jsonFormat[String, String, Calendar, BigDecimal, DebitTransactionRequest](DebitTransactionRequest, "id", "kind", "instant", "amount")
 }

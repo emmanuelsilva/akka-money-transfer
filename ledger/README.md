@@ -7,4 +7,58 @@
 The project setup is based on the SBT tool.
 
 - Test: `sbt test`
-- Run: `sbt run` to start the server on the 8080 port.
+
+## Kubernetes deploy 
+* * *
+
+### Build docker image:
+
+```shell
+sbt docker:publishLocal
+```
+
+### Create Kubernetes resources:
+
+Start minikube if it's not started yet:
+
+```shell
+minikube start --vm=true
+eval $(minikube docker-env)
+minikube addons enable ingress
+```
+
+*The argument --vm=true is required in order to make the ingress work in the minikube on mac os.
+
+- Create service account and role:
+```shell
+kubectl apply -n ledger -f kubernetes/binding.yaml
+```
+
+- Create deployment:
+```shell
+kubectl apply -n ledger -f kubernetes/deployment.yaml
+```
+
+- Create service:
+```shell
+kubectl apply -n ledger -f kubernetes/service.yaml
+```
+- Create ingress:
+
+```shell
+kubectl apply -n ledger -f kubernetes/ingress.yaml
+```
+
+- Scale:
+```shell
+kubectl scale deployments/ledger --replicas=2
+```
+
+### Akka cluster HTTP API
+
+1 - Listing the cluster members:
+```shell
+KUBE_IP=$(minikube ip)
+MANAGEMENT_PORT=$(kubectl get svc ledger-service  -ojsonpath="{.spec.ports[?(@.name==\"management\")].nodePort}")
+curl --silent  http://$KUBE_IP:$MANAGEMENT_PORT/cluster/members | jq
+```

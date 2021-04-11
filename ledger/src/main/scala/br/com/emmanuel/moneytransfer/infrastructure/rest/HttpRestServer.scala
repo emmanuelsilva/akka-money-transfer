@@ -1,43 +1,42 @@
 package br.com.emmanuel.moneytransfer.infrastructure.rest
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.scaladsl.AskPattern._
+import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.server.Directives._
-import br.com.emmanuel.moneytransfer.domain.ledger.Account
-import br.com.emmanuel.moneytransfer.domain.ledger.BankLedgerProtocol.{Accounts, Command}
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.BankLedgerActor
+import br.com.emmanuel.moneytransfer.infrastructure.actors.factory.ShardingAccountEntityFactory
 import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
+import scala.util.Success
 
 object HttpRestServer extends SprayJsonSupport with DefaultJsonProtocol {
 
-  implicit val system: ActorSystem[Command] = ActorSystem(BankLedgerActor(), "bank")
-  implicit val executionContext: ExecutionContext = system.executionContext
-
-  implicit val accountJsonFormat = jsonFormat1(Account)
-  implicit val accountsJsonFormat = jsonFormat1(Accounts)
-
-  def main(args: Array[String]): Unit = {
-
-    val bankActor = system
+  def init(context: ActorContext[Nothing], sharding: ClusterSharding): Unit = {
+    implicit val system = context.system
+    implicit val executionContext: ExecutionContext = context.executionContext
 
     val route = {
-      concat(AccountRoute.route(bankActor))
+      concat(AccountRoute.route(ShardingAccountEntityFactory(sharding)))
     }
 
-    val server = Http()
-      .newServerAt("localhost", 8080)
-      .bind(route)
+    println("HTTP server starting...")
 
-    println("Server started...")
+    Http()
+      .newServerAt("0.0.0.0", 8080)
+      .bind(route)
+      .onComplete {
+        case Success(binding) =>
+          val address = binding.localAddress
+          system.log.info(s"HTTP server started at ${address.getHostName} at ${address.getPort}")
+          system.log.info(s"address=$address")
+      }
+
     StdIn.readLine()
 
-    server.onComplete(_ => system.terminate())
 
   }
-
 }

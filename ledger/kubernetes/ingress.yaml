@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ledger-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+    - http:
+        paths:
+        - path: /api(/|$)(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: ledger-service
+              port:
+                number: 8080
+        - path: /system(/|$)(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: ledger-service
+              port:
+                number: 8558

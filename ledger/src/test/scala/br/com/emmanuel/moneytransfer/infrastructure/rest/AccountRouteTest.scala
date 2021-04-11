@@ -1,200 +1,180 @@
 package br.com.emmanuel.moneytransfer.infrastructure.rest
 
-import akka.actor.Scheduler
+import akka.Done
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.{MessageEntity, StatusCodes}
-import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.util.Timeout
-import br.com.emmanuel.moneytransfer.domain.ledger.BankLedgerProtocol.{Balance, Accounts, Command, CreateAccount, Credit, GetAccountBalance, GetAccounts, Response}
-import br.com.emmanuel.moneytransfer.domain.ledger.{Account, CreditTransaction, DebitTransaction}
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.BankLedgerActor
-import org.scalatest.concurrent.ScalaFutures._
-import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
+import akka.pattern.StatusReply
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor.CurrentBalance
+import br.com.emmanuel.moneytransfer.infrastructure.factory.AccountTestEntityFactory
+import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
+import com.typesafe.config.{Config, ConfigFactory}
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
+import org.scalatest.wordspec.AnyWordSpecLike
 
-import java.util.UUID
-import scala.concurrent.duration.DurationInt
+import java.util.Calendar
 
-class AccountRouteTest extends WordSpecLike with BeforeAndAfter with ScalatestRouteTest with Matchers with HasJsonSerializer {
+class AccountRouteTest extends AnyWordSpecLike
+                          with BeforeAndAfterEach
+                          with ScalatestRouteTest
+                          with ScalaFutures
+                          with HasJsonSerializer {
 
   import akka.actor.typed.scaladsl.adapter._
+
   implicit val typedSystem: ActorSystem[Nothing] = system.toTyped
-  implicit val timeout: Timeout = Timeout(500.milliseconds)
-  implicit val scheduler: Scheduler = system.scheduler
+  var testKit: ActorTestKit = ActorTestKit()
 
-  def generateId: String = UUID.randomUUID().toString
+  override def testConfig: Config = ConfigFactory.load("application-test.conf")
 
-  def createDebitTransaction(account: Account, amount: BigDecimal): DebitTransaction = {
-    val now = java.util.Calendar.getInstance()
-    DebitTransaction(generateId, "debit", now, account, amount)
+  override def beforeEach(): Unit = {
+    testKit = ActorTestKit()
   }
 
-  def createCreditTransaction(account: Account, amount: BigDecimal): CreditTransaction = {
-    val now = java.util.Calendar.getInstance()
-    CreditTransaction(generateId, "credit", now, account, amount)
+  override def afterEach(): Unit = {
+    testKit.shutdownTestKit()
   }
 
-  def createCreditCommand(account: Account, amount: BigDecimal, replyTo: ActorRef[Response]): Credit = {
-    val now = java.util.Calendar.getInstance()
-    Credit("credit", now, account, amount, replyTo)
-  }
+  "Account" must {
+    "be created" in {
+      val account = AccountRequest("123")
+      val accountPostEntity = Marshal(account).to[MessageEntity].futureValue
 
-  val testKit: ActorTestKit = ActorTestKit()
+      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+      val testedRoute = Post("/accounts", accountPostEntity) ~> AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
-  "post /accounts/{accountId}/debit for a non-existent account should return not found" in {
-    val bankActor = testKit.spawn(BankLedgerActor())
-    val account = Account("123")
-    val debitTransaction = createDebitTransaction(account, 500)
-    val debitPostEntity = Marshal(debitTransaction).to[MessageEntity].futureValue
+      testedRoute ~> check {
+        status shouldEqual StatusCodes.Created
+      }
 
-    val testedRoute = Post("/accounts/123/debit", debitPostEntity) ~> AccountRoute.route(bankActor)
+      val replyProbe = testKit.createTestProbe[AccountLedgerEntityActor.Reply]
+      accountEntity ! AccountLedgerEntityActor.GetBalance(replyProbe.ref)
 
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.NotFound
+      val currentBalance = replyProbe.expectMessageType[CurrentBalance]
+      currentBalance.balance shouldBe 0
     }
   }
 
-  "post /accounts/{accountId}/debit should return bad request when account has no enough balance" in {
-    val bankActor = testKit.spawn(BankLedgerActor())
-    val probe = testKit.createTestProbe[Response]
+  "Credit" must {
 
-    val account = Account("123")
+    "return HTTP OK when credited into an existent account" in {
+      val account = AccountRequest("123")
+      val creditTransaction = CreditTransactionRequest("tid", "credit", Calendar.getInstance(), 100)
+      val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
+      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
 
-    bankActor ! CreateAccount(account)
-    bankActor ! createCreditCommand(account, 100, probe.ref)
+      openAccount(accountEntity)
 
-    val debitTransaction = createDebitTransaction(account, 500)
-    val debitPostEntity = Marshal(debitTransaction).to[MessageEntity].futureValue
+      val testedRoute = Post(s"/accounts/${account.id}/credit", creditPostEntity) ~>
+        AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
-    val testedRoute = Post("/accounts/123/debit", debitPostEntity) ~> AccountRoute.route(bankActor)
+      testedRoute ~> check {
+        status shouldEqual StatusCodes.OK
+      }
 
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.BadRequest
-      assertThatBalanceIs(bankActor, account, 100)
+      assertThatCurrentBalanceIs(accountEntity, 100)
+    }
+
+    "return HTTP Bad response when credited into a non-existent account" in {
+      val account = AccountRequest("123")
+      val creditTransaction = CreditTransactionRequest("tid", "credit", Calendar.getInstance(), 100)
+      val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
+      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+
+      val testedRoute = Post(s"/accounts/${account.id}/credit", creditPostEntity) ~>
+        AccountRoute.route(AccountTestEntityFactory(accountEntity))
+
+      testedRoute ~> check {
+        responseAs[String] shouldBe "account=123 is not opened"
+        status shouldEqual StatusCodes.BadRequest
+      }
+    }
+
+  }
+
+  "Debit" must {
+    "return HTTP OK when there's enough balance " in {
+      val account = AccountRequest("123")
+      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+
+      openAccount(accountEntity)
+      deposit(accountEntity, 100)
+
+      val debitTransaction = DebitTransactionRequest("deb123", "debit", Calendar.getInstance(), 50)
+      val debitPostEntity = Marshal(debitTransaction).to[MessageEntity].futureValue
+
+      val testedRoute = Post(s"/accounts/${account.id}/debit", debitPostEntity) ~>
+        AccountRoute.route(AccountTestEntityFactory(accountEntity))
+
+      testedRoute ~> check {
+        status shouldEqual StatusCodes.OK
+      }
+
+      assertThatCurrentBalanceIs(accountEntity, 50)
+    }
+
+    "return HTTP BadRequest when overdraft" in {
+      val account = AccountRequest("123")
+      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+
+      openAccount(accountEntity)
+      deposit(accountEntity, 25)
+
+      val debitTransaction = DebitTransactionRequest("deb123", "debit", Calendar.getInstance(), 100)
+      val debitPostEntity = Marshal(debitTransaction).to[MessageEntity].futureValue
+
+      val testedRoute = Post(s"/accounts/${account.id}/debit", debitPostEntity) ~>
+        AccountRoute.route(AccountTestEntityFactory(accountEntity))
+
+      testedRoute ~> check {
+        responseAs[String] shouldBe "insufficient balance to debit 100"
+        status shouldEqual StatusCodes.BadRequest
+      }
+
+      assertThatCurrentBalanceIs(accountEntity, 25)
     }
   }
 
-  "post /accounts/{accountId}/debit should debit from the balance account when there is available balance" in {
-    val bankActor = testKit.spawn(BankLedgerActor())
-    val probe = testKit.createTestProbe[Response]
+  "Balance" must {
+    "returned in HTTP OK with the current balance" in {
+      val account = AccountRequest("123")
+      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
 
-    val account = Account("123")
+      openAccount(accountEntity)
+      deposit(accountEntity, 100)
 
-    bankActor ! CreateAccount(account)
-    bankActor ! createCreditCommand(account, 100, probe.ref)
+      val testedRoute = Get(s"/accounts/${account.id}/balance") ~>
+        AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
-    val debitTransaction = createDebitTransaction(account, 50)
-    val debitPostEntity = Marshal(debitTransaction).to[MessageEntity].futureValue
-
-    val testedRoute = Post("/accounts/123/debit", debitPostEntity) ~> AccountRoute.route(bankActor)
-
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.OK
-      assertThatBalanceIs(bankActor, account, 50)
+      testedRoute ~> check {
+        status shouldEqual StatusCodes.OK
+        val currentBalance = responseAs[CurrentBalance]
+        currentBalance.balance shouldBe 100
+      }
     }
   }
 
-  "post /accounts/{accountId}/credit should return 404 when the account doesn't exist" in {
-    val bankActor = testKit.spawn(BankLedgerActor())
-    val account = Account("123")
-
-    val creditTransaction = createCreditTransaction(account, 100)
-    val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
-
-    val testedRoute = Post("/accounts/123/credit", creditPostEntity) ~> AccountRoute.route(bankActor)
-
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.NotFound
-    }
+  private def openAccount(accountEntity: ActorRef[AccountLedgerEntityActor.Command]) = {
+    val createAccountReplyProbe = testKit.createTestProbe[StatusReply[Done]]
+    accountEntity ! AccountLedgerEntityActor.OpenAccount(createAccountReplyProbe.ref)
   }
 
-  "post /accounts/{accountId}/credit should credit into the existent account balance" in {
-    val bankActor = testKit.spawn(BankLedgerActor())
-    val account = Account("123")
-
-    bankActor ! CreateAccount(account)
-    val creditTransaction = createCreditTransaction(account, 100)
-    val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
-
-    val testedRoute = Post("/accounts/123/credit", creditPostEntity) ~> AccountRoute.route(bankActor)
-
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.OK
-      assertThatBalanceIs(bankActor, account, 100)
-    }
+  private def deposit(accountEntity: ActorRef[AccountLedgerEntityActor.Command], amount: BigDecimal): Unit = {
+    val creditReplyProbe = testKit.createTestProbe[StatusReply[Done]]
+    accountEntity ! AccountLedgerEntityActor.Credit("credit", Calendar.getInstance(), amount, creditReplyProbe.ref)
   }
 
-  "get /accounts/{accountId}/balance should return zero balance when there is no transactions for the account" in {
-    val bankActor = testKit.spawn(BankLedgerActor())
-    val account = Account("123")
-    bankActor ! CreateAccount(account)
+  private def assertThatCurrentBalanceIs(accountEntity: ActorRef[AccountLedgerEntityActor.Command], amount: BigDecimal) = {
+    val replyProbe = testKit.createTestProbe[AccountLedgerEntityActor.Reply]
+    accountEntity ! AccountLedgerEntityActor.GetBalance(replyProbe.ref)
 
-    val testedRoute = Get("/accounts/123/balance") ~> AccountRoute.route(bankActor)
-
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.OK
-      val accountBalance = responseAs[Balance]
-      accountBalance.account shouldBe account
-      accountBalance.amount shouldBe 0
-    }
+    val currentBalance = replyProbe.expectMessageType[CurrentBalance]
+    currentBalance.balance shouldBe amount
   }
-
-  "post /accounts with valid body should create an account" in {
-    val bankActor = testKit.spawn(BankLedgerActor())
-    val probe = testKit.createTestProbe[Response]
-    val account = Account("123")
-    val accountPostEntity = Marshal(account).to[MessageEntity].futureValue
-
-    val testedRoute = Post("/accounts", accountPostEntity) ~> AccountRoute.route(bankActor)
-
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.Created
-    }
-
-    bankActor ! GetAccounts(probe.ref)
-    val getAllAccountsResponse = probe.expectMessageType[Accounts]
-    assertResult(1)(getAllAccountsResponse.accounts.size)
-    assert(getAllAccountsResponse.accounts.contains(account))
-  }
-
-  "get /accounts should all registered accounts" in {
-    val probe = testKit.createTestProbe[Command]
-    val testedRoute = Get("/accounts") ~> AccountRoute.route(probe.ref)
-
-    val getAccountsMessage = probe.expectMessageType[GetAccounts]
-    getAccountsMessage.reply ! Accounts(createMockAccounts(10))
-
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.OK
-      val body = responseAs[Accounts]
-      assertResult(10)(body.accounts.size)
-    }
-  }
-
-  "get /accounts should return 404 when there is no one account" in {
-    val probe = testKit.createTestProbe[Command]
-    val testedRoute = Get("/accounts") ~> Route.seal(AccountRoute.route(probe.ref))
-
-    val getAccountsMessage = probe.expectMessageType[GetAccounts]
-    getAccountsMessage.reply ! Accounts(Seq[Account]())
-
-    testedRoute ~> check {
-      status shouldEqual StatusCodes.NotFound
-    }
-  }
-
-  private def assertThatBalanceIs(bankActor: ActorRef[Command], account: Account, expectedBalance: BigDecimal): Unit = {
-    val probe = testKit.createTestProbe[Response]
-    bankActor ! GetAccountBalance(account, probe.ref)
-    val accountBalanceMessage = probe.expectMessageType[Balance]
-
-    accountBalanceMessage.account shouldBe account
-    accountBalanceMessage.amount shouldBe expectedBalance
-  }
-
-  private def createMockAccounts(qtd: Int) = (1 to qtd).map(_.toString).map(i => Account(s"account-$i"))
-
 }

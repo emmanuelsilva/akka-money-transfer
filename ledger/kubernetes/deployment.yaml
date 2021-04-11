@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ledger
+  name: ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+
+  template:
+    metadata:
+      labels:
+        app: ledger
+        actorSystemName: ledger
+    spec:
+      containers:
+        - name: ledger
+          image: ledger:1.0
+          imagePullPolicy: Never
+          livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            httpGet:
+              path: /alive
+              port: management
+          readinessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            httpGet:
+              path: /ready
+              port: management
+          ports:
+            # akka-management
+            - containerPort: 8558
+              protocol: TCP
+              name: management
+            # akka remoting
+            - name: remoting
+              containerPort: 2551
+            # HTTP API
+            - name: api
+              containerPort: 8080
+          env:
+            - name: AKKA_CLUSTER_BOOTSTRAP_SERVICE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: "metadata.labels['app']"
