@@ -1,6 +1,12 @@
 # Ledger
 * * *
 
+Every account is an Akka actor model to deal with concurrency issues.
+
+The actors are distributed across the cluster nodes using the cluster sharding approach.
+
+All changes are stored as an event using the event sourcing approach.
+
 ## Setup
 * * *
 
