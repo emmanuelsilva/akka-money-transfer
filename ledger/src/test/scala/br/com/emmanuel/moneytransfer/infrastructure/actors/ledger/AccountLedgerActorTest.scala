@@ -84,12 +84,19 @@ class AccountLedgerActorTest
 
       result.reply shouldBe StatusReply.Ack
       result.event shouldBe a[AccountClosed.type]
-      result.state shouldBe a[ClosedAccount.type]
+      result.state shouldBe a[ClosedAccount]
     }
 
     "reject deposit when it's closed" in {
       eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount)
       eventSourcedTestKit.runCommand[StatusReply[Done]](CloseAccount)
+      val result = eventSourcedTestKit.runCommand[StatusReply[Done]](Credit("deposit", instant, 100, _))
+
+      result.reply.isError shouldBe true
+      result.hasNoEvents shouldBe true
+    }
+
+    "reject deposit when it's not opened (empty)" in {
       val result = eventSourcedTestKit.runCommand[StatusReply[Done]](Credit("deposit", instant, 100, _))
 
       result.reply.isError shouldBe true

@@ -21,14 +21,18 @@ object AccountLedgerActor {
 
   type ReplyActorType = ActorRef[StatusReply[Done]]
 
+  sealed trait HasReply {
+    def replyTo: ReplyActorType
+  }
+
   //commands
   sealed trait Command extends SerializableMessage
 
   //write commands
-  final case class OpenAccount(replyTo: ReplyActorType) extends Command with SerializableMessage
-  final case class CloseAccount(replyTo: ReplyActorType) extends Command
-  final case class Credit(kind: String, instant: Calendar, amount: BigDecimal, replyTo: ReplyActorType) extends Command
-  final case class Debit(kind: String, instant: Calendar, amount: BigDecimal, replyTo: ReplyActorType) extends Command
+  final case class OpenAccount(replyTo: ReplyActorType) extends Command with HasReply
+  final case class CloseAccount(replyTo: ReplyActorType) extends Command with HasReply
+  final case class Credit(kind: String, instant: Calendar, amount: BigDecimal, replyTo: ReplyActorType) extends Command with HasReply
+  final case class Debit(kind: String, instant: Calendar, amount: BigDecimal, replyTo: ReplyActorType) extends Command with HasReply
 
   //read commands
   final case class GetBalance(replyTo: ActorRef[Reply]) extends Command
@@ -54,28 +58,28 @@ object AccountLedgerActor {
   def commandHandler(accountId: String): (Account, Command) => Effect[Event, Account] = { (state, command) =>
 
     state match {
-      case _: EmptyAccount =>
+      case EmptyAccount(_) =>
         command match {
-          case o: OpenAccount => openAccount(o)
-          case c: Credit      => Effect.reply(c.replyTo)(StatusReply.Error(s"account=$accountId is not opened"))
-          case _              => Effect.unhandled.thenNoReply()
+          case cmd: OpenAccount  => openAccount(cmd)
+          case cmd: GetBalance   => Effect.reply(cmd.replyTo)(CurrentBalance(0))
+          case cmd: CloseAccount => Effect.persist(AccountClosed).thenReply(cmd.replyTo)(_ => StatusReply.Ack)
+          case cmd: HasReply     => Effect.reply(cmd.replyTo)(StatusReply.Error(s"account=$accountId is not opened"))
+          case _                 => Effect.unhandled.thenNoReply()
         }
 
       case account: OpenedAccount =>
         command match {
-          case c: Credit        => credit(c)
-          case d: Debit         => debit(account, d)
-          case c: CloseAccount  => closeAccount(account, c)
-          case g: GetBalance    => getBalance(account, g)
-          case c: OpenAccount => Effect.reply(c.replyTo)(StatusReply.Error(s"account=$accountId is already opened"))
+          case cmd: Credit        => credit(cmd)
+          case cmd: Debit         => debit(account, cmd)
+          case cmd: CloseAccount  => closeAccount(account, cmd)
+          case cmd: GetBalance    => getBalance(account, cmd)
+          case cmd: OpenAccount   => Effect.reply(cmd.replyTo)(StatusReply.Error(s"account=$accountId is already opened"))
         }
 
-      case _: ClosedAccount =>
+      case ClosedAccount(_) =>
         command match {
-          case c: Credit       => Effect.reply(c.replyTo)(StatusReply.Error(s"account=$accountId is already close"))
-          case d: Debit        => Effect.reply(d.replyTo)(StatusReply.Error(s"account=$accountId is already close"))
-          case c: CloseAccount => Effect.reply(c.replyTo)(StatusReply.Error(s"account=$accountId is already close"))
-          case g: GetBalance   => Effect.reply(g.replyTo)(CurrentBalance(0))
+          case cmd: GetBalance   => Effect.reply(cmd.replyTo)(CurrentBalance(0))
+          case cmd: HasReply     => Effect.reply(cmd.replyTo)(StatusReply.Error(s"account=$accountId is already close"))
         }
     }
   }
