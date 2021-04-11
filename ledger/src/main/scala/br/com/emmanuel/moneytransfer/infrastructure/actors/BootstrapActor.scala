@@ -7,7 +7,7 @@ import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.cluster.typed.{Cluster, Subscribe}
 import akka.management.cluster.bootstrap.ClusterBootstrap
 import akka.management.scaladsl.AkkaManagement
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor
 import br.com.emmanuel.moneytransfer.infrastructure.rest.HttpRestServer
 
 object BootstrapActor {
@@ -21,7 +21,7 @@ object BootstrapActor {
   }
 
   private def startLedgerApplication(context: ActorContext[Nothing], sharding: ClusterSharding): Unit = {
-    AccountLedgerEntityActor.configureSharding(sharding)
+    AccountLedgerActor.configureSharding(sharding)
     HttpRestServer.init(context, sharding)
   }
 

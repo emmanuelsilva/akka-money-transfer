@@ -7,14 +7,14 @@ import akka.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import br.com.emmanuel.moneytransfer.domain.{Account, ClosedAccount, OpenedAccount}
 import br.com.emmanuel.moneytransfer.event.AccountEvent._
 import br.com.emmanuel.moneytransfer.event.Event
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor._
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.util.Calendar
 
-class AccountLedgerEntityActorTest
+class AccountLedgerActorTest
   extends ScalaTestWithActorTestKit(EventSourcedBehaviorTestKit.config.withFallback(ConfigFactory.defaultApplication()))
   with AnyWordSpecLike
   with BeforeAndAfterEach {
@@ -22,7 +22,7 @@ class AccountLedgerEntityActorTest
   private val eventSourcedTestKit =
     EventSourcedBehaviorTestKit[Command, Event, Account](
     system,
-    AccountLedgerEntityActor("1")
+    AccountLedgerActor("1")
   )
 
   private val instant = Calendar.getInstance()

@@ -1,7 +1,7 @@
 package br.com.emmanuel.moneytransfer.infrastructure.rest
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor.CurrentBalance
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor.CurrentBalance
 import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
 import spray.json.{DefaultJsonProtocol, JsString, JsValue, JsonFormat}
 

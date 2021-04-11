@@ -8,8 +8,8 @@ import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.{MessageEntity, StatusCodes}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.pattern.StatusReply
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor.CurrentBalance
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor.CurrentBalance
 import br.com.emmanuel.moneytransfer.infrastructure.factory.AccountTestEntityFactory
 import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -46,15 +46,15 @@ class AccountRouteTest extends AnyWordSpecLike
       val account = AccountRequest("123")
       val accountPostEntity = Marshal(account).to[MessageEntity].futureValue
 
-      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
       val testedRoute = Post("/accounts", accountPostEntity) ~> AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
       testedRoute ~> check {
         status shouldEqual StatusCodes.Created
       }
 
-      val replyProbe = testKit.createTestProbe[AccountLedgerEntityActor.Reply]
-      accountEntity ! AccountLedgerEntityActor.GetBalance(replyProbe.ref)
+      val replyProbe = testKit.createTestProbe[AccountLedgerActor.Reply]
+      accountEntity ! AccountLedgerActor.GetBalance(replyProbe.ref)
 
       val currentBalance = replyProbe.expectMessageType[CurrentBalance]
       currentBalance.balance shouldBe 0
@@ -67,7 +67,7 @@ class AccountRouteTest extends AnyWordSpecLike
       val account = AccountRequest("123")
       val creditTransaction = CreditTransactionRequest("tid", "credit", Calendar.getInstance(), 100)
       val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
-      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
 
       openAccount(accountEntity)
 
@@ -85,7 +85,7 @@ class AccountRouteTest extends AnyWordSpecLike
       val account = AccountRequest("123")
       val creditTransaction = CreditTransactionRequest("tid", "credit", Calendar.getInstance(), 100)
       val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
-      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
 
       val testedRoute = Post(s"/accounts/${account.id}/credit", creditPostEntity) ~>
         AccountRoute.route(AccountTestEntityFactory(accountEntity))
@@ -101,7 +101,7 @@ class AccountRouteTest extends AnyWordSpecLike
   "Debit" must {
     "return HTTP OK when there's enough balance " in {
       val account = AccountRequest("123")
-      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
 
       openAccount(accountEntity)
       deposit(accountEntity, 100)
@@ -121,7 +121,7 @@ class AccountRouteTest extends AnyWordSpecLike
 
     "return HTTP BadRequest when overdraft" in {
       val account = AccountRequest("123")
-      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
 
       openAccount(accountEntity)
       deposit(accountEntity, 25)
@@ -144,7 +144,7 @@ class AccountRouteTest extends AnyWordSpecLike
   "Balance" must {
     "returned in HTTP OK with the current balance" in {
       val account = AccountRequest("123")
-      val accountEntity = testKit.spawn(AccountLedgerEntityActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
 
       openAccount(accountEntity)
       deposit(accountEntity, 100)
@@ -160,19 +160,19 @@ class AccountRouteTest extends AnyWordSpecLike
     }
   }
 
-  private def openAccount(accountEntity: ActorRef[AccountLedgerEntityActor.Command]) = {
+  private def openAccount(accountEntity: ActorRef[AccountLedgerActor.Command]) = {
     val createAccountReplyProbe = testKit.createTestProbe[StatusReply[Done]]
-    accountEntity ! AccountLedgerEntityActor.OpenAccount(createAccountReplyProbe.ref)
+    accountEntity ! AccountLedgerActor.OpenAccount(createAccountReplyProbe.ref)
   }
 
-  private def deposit(accountEntity: ActorRef[AccountLedgerEntityActor.Command], amount: BigDecimal): Unit = {
+  private def deposit(accountEntity: ActorRef[AccountLedgerActor.Command], amount: BigDecimal): Unit = {
     val creditReplyProbe = testKit.createTestProbe[StatusReply[Done]]
-    accountEntity ! AccountLedgerEntityActor.Credit("credit", Calendar.getInstance(), amount, creditReplyProbe.ref)
+    accountEntity ! AccountLedgerActor.Credit("credit", Calendar.getInstance(), amount, creditReplyProbe.ref)
   }
 
-  private def assertThatCurrentBalanceIs(accountEntity: ActorRef[AccountLedgerEntityActor.Command], amount: BigDecimal) = {
-    val replyProbe = testKit.createTestProbe[AccountLedgerEntityActor.Reply]
-    accountEntity ! AccountLedgerEntityActor.GetBalance(replyProbe.ref)
+  private def assertThatCurrentBalanceIs(accountEntity: ActorRef[AccountLedgerActor.Command], amount: BigDecimal) = {
+    val replyProbe = testKit.createTestProbe[AccountLedgerActor.Reply]
+    accountEntity ! AccountLedgerActor.GetBalance(replyProbe.ref)
 
     val currentBalance = replyProbe.expectMessageType[CurrentBalance]
     currentBalance.balance shouldBe amount

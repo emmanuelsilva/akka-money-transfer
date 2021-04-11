@@ -7,8 +7,8 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.StatusReply
 import akka.util.Timeout
 import br.com.emmanuel.moneytransfer.infrastructure.actors.factory.AccountEntityFactory
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor
-import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerEntityActor.CurrentBalance
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor
+import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor.CurrentBalance
 import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
 
 import scala.concurrent.ExecutionContext
@@ -28,7 +28,7 @@ object AccountRoute extends HasJsonSerializer {
             post {
               entity(as[AccountRequest]) { account => {
                 val accountEntity = factory.getAccountEntity(account.id)
-                val request = accountEntity.askWithStatus(rep => AccountLedgerEntityActor.OpenAccount(rep))
+                val request = accountEntity.askWithStatus(rep => AccountLedgerActor.OpenAccount(rep))
 
                 onComplete(request) {
                   case Success(_)                             => complete(StatusCodes.Created)
@@ -46,7 +46,7 @@ object AccountRoute extends HasJsonSerializer {
           post {
             entity(as[CreditTransactionRequest]) { transaction => {
               val accountEntity = factory.getAccountEntity(accountId)
-              val request = accountEntity.askWithStatus(ref => AccountLedgerEntityActor.Credit(transaction.kind, transaction.instant, transaction.amount, ref))
+              val request = accountEntity.askWithStatus(ref => AccountLedgerActor.Credit(transaction.kind, transaction.instant, transaction.amount, ref))
 
               onComplete(request) {
                 case Success(_)                             => complete(StatusCodes.OK)
@@ -62,7 +62,7 @@ object AccountRoute extends HasJsonSerializer {
           post {
             entity(as[DebitTransactionRequest]) { transaction => {
               val accountEntity = factory.getAccountEntity(accountId)
-              val request = accountEntity.askWithStatus(ref => AccountLedgerEntityActor.Debit(transaction.kind, transaction.instant, transaction.amount, ref))
+              val request = accountEntity.askWithStatus(ref => AccountLedgerActor.Debit(transaction.kind, transaction.instant, transaction.amount, ref))
 
               onComplete(request) {
                 case Success(_)                             => complete(StatusCodes.OK)
@@ -76,7 +76,7 @@ object AccountRoute extends HasJsonSerializer {
         path(Segment / "balance") { accountId =>
           get {
             val accountEntity = factory.getAccountEntity(accountId)
-            val request = accountEntity.ask(ref => AccountLedgerEntityActor.GetBalance(ref))
+            val request = accountEntity.ask(ref => AccountLedgerActor.GetBalance(ref))
 
             onComplete(request) {
               case Success(currentBalance) => {

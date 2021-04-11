@@ -14,7 +14,7 @@ import br.com.emmanuel.moneytransfer.infrastructure.serialization.SerializableMe
 
 import java.util.Calendar
 
-object AccountLedgerEntityActor {
+object AccountLedgerActor {
 
   // sharding
   val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("account-ledger")
@@ -40,7 +40,7 @@ object AccountLedgerEntityActor {
   def configureSharding(sharding: ClusterSharding): ActorRef[ShardingEnvelope[Command]] = {
     sharding.init(
       Entity(typeKey = TypeKey)
-      (createBehavior = entityContext => AccountLedgerEntityActor(entityContext.entityId))
+      (createBehavior = entityContext => AccountLedgerActor(entityContext.entityId))
     )
   }
 
