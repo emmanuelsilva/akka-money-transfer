@@ -14,13 +14,14 @@ Experimented technologies
 - Kafka
 
 
-### Communication
+### Service communication
 * * *
 The main objective is that all write messages exchanged by every microservice must be asynchronous. 
 
 The Kafka is used to make asynchronous communication possible and create an agnostic layer to isolate the technology chosen for each microservice from the external world.
 
 ### Services
+* * * 
 
 #### Ledger
 * * *
