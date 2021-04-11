@@ -2,8 +2,5 @@
   "id": "123",
   "kind": "credit",
   "instant": "2021-03-01 16:50:00",
-  "account": {
-    "id": "123"
-  },
   "amount": 50
 }
