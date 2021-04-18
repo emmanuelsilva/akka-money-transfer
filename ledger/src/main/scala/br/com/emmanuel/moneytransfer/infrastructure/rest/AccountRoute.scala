@@ -9,7 +9,7 @@ import akka.util.Timeout
 import br.com.emmanuel.moneytransfer.infrastructure.actors.factory.AccountEntityFactory
 import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor
 import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor.CurrentBalance
-import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
+import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{OpenAccountRequest, CreditTransactionRequest, DebitTransactionRequest}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
@@ -26,9 +26,9 @@ object AccountRoute extends HasJsonSerializer {
         pathEnd {
           concat(
             post {
-              entity(as[AccountRequest]) { account => {
-                val accountEntity = factory.getAccountEntity(account.id)
-                val request = accountEntity.askWithStatus(rep => AccountLedgerActor.OpenAccount(rep))
+              entity(as[OpenAccountRequest]) { openAccountRequest => {
+                val accountEntity = factory.getAccountEntity(openAccountRequest.id)
+                val request = accountEntity.askWithStatus(rep => AccountLedgerActor.OpenAccount(openAccountRequest.userId, rep))
 
                 onComplete(request) {
                   case Success(_)                             => complete(StatusCodes.Created)

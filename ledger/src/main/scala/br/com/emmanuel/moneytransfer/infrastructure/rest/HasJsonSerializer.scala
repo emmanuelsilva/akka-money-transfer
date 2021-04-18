@@ -2,7 +2,7 @@ package br.com.emmanuel.moneytransfer.infrastructure.rest
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor.CurrentBalance
-import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
+import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{OpenAccountRequest, CreditTransactionRequest, DebitTransactionRequest}
 import spray.json.{DefaultJsonProtocol, JsString, JsValue, JsonFormat}
 
 import java.text.SimpleDateFormat
@@ -30,7 +30,7 @@ trait HasJsonSerializer extends SprayJsonSupport with DefaultJsonProtocol {
 
   import CalendarMarshalling._
 
-  implicit val accountJsonFormat = jsonFormat1(AccountRequest)
+  implicit val openAccountJsonFormat = jsonFormat2(OpenAccountRequest)
   implicit val currentBalanceJsonFormat = jsonFormat1(CurrentBalance)
 
   implicit val creditTransactionRequestJsonFormat = {

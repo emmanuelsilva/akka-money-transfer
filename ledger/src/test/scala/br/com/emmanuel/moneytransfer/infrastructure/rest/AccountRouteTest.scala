@@ -11,7 +11,7 @@ import akka.pattern.StatusReply
 import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor
 import br.com.emmanuel.moneytransfer.infrastructure.actors.ledger.AccountLedgerActor.CurrentBalance
 import br.com.emmanuel.moneytransfer.infrastructure.factory.AccountTestEntityFactory
-import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{AccountRequest, CreditTransactionRequest, DebitTransactionRequest}
+import br.com.emmanuel.moneytransfer.infrastructure.rest.request.{CreditTransactionRequest, DebitTransactionRequest, OpenAccountRequest}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures
@@ -41,12 +41,14 @@ class AccountRouteTest extends AnyWordSpecLike
     testKit.shutdownTestKit()
   }
 
+  private val createOpenAccountRequest: OpenAccountRequest = OpenAccountRequest("123", "456")
+
   "Account" must {
     "be created" in {
-      val account = AccountRequest("123")
-      val accountPostEntity = Marshal(account).to[MessageEntity].futureValue
+      val openAccountRequest = createOpenAccountRequest
+      val accountPostEntity = Marshal(openAccountRequest).to[MessageEntity].futureValue
 
-      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(openAccountRequest.id))
       val testedRoute = Post("/accounts", accountPostEntity) ~> AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
       testedRoute ~> check {
@@ -64,14 +66,14 @@ class AccountRouteTest extends AnyWordSpecLike
   "Credit" must {
 
     "return HTTP OK when credited into an existent account" in {
-      val account = AccountRequest("123")
+      val openAccountRequest = createOpenAccountRequest
       val creditTransaction = CreditTransactionRequest("tid", "credit", Calendar.getInstance(), 100)
       val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
-      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(openAccountRequest.id))
 
-      openAccount(accountEntity)
+      openAccount(accountEntity, openAccountRequest)
 
-      val testedRoute = Post(s"/accounts/${account.id}/credit", creditPostEntity) ~>
+      val testedRoute = Post(s"/accounts/${openAccountRequest.id}/credit", creditPostEntity) ~>
         AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
       testedRoute ~> check {
@@ -82,12 +84,12 @@ class AccountRouteTest extends AnyWordSpecLike
     }
 
     "return HTTP Bad response when credited into a non-existent account" in {
-      val account = AccountRequest("123")
+      val openAccountRequest = createOpenAccountRequest
       val creditTransaction = CreditTransactionRequest("tid", "credit", Calendar.getInstance(), 100)
       val creditPostEntity = Marshal(creditTransaction).to[MessageEntity].futureValue
-      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
+      val accountEntity = testKit.spawn(AccountLedgerActor(openAccountRequest.id))
 
-      val testedRoute = Post(s"/accounts/${account.id}/credit", creditPostEntity) ~>
+      val testedRoute = Post(s"/accounts/${openAccountRequest.id}/credit", creditPostEntity) ~>
         AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
       testedRoute ~> check {
@@ -100,16 +102,16 @@ class AccountRouteTest extends AnyWordSpecLike
 
   "Debit" must {
     "return HTTP OK when there's enough balance " in {
-      val account = AccountRequest("123")
-      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
+      val openAccountRequest = createOpenAccountRequest
+      val accountEntity = testKit.spawn(AccountLedgerActor(openAccountRequest.id))
 
-      openAccount(accountEntity)
+      openAccount(accountEntity, openAccountRequest)
       deposit(accountEntity, 100)
 
       val debitTransaction = DebitTransactionRequest("deb123", "debit", Calendar.getInstance(), 50)
       val debitPostEntity = Marshal(debitTransaction).to[MessageEntity].futureValue
 
-      val testedRoute = Post(s"/accounts/${account.id}/debit", debitPostEntity) ~>
+      val testedRoute = Post(s"/accounts/${openAccountRequest.id}/debit", debitPostEntity) ~>
         AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
       testedRoute ~> check {
@@ -120,16 +122,16 @@ class AccountRouteTest extends AnyWordSpecLike
     }
 
     "return HTTP BadRequest when overdraft" in {
-      val account = AccountRequest("123")
-      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
+      val openAccountRequest = createOpenAccountRequest
+      val accountEntity = testKit.spawn(AccountLedgerActor(openAccountRequest.id))
 
-      openAccount(accountEntity)
+      openAccount(accountEntity, openAccountRequest)
       deposit(accountEntity, 25)
 
       val debitTransaction = DebitTransactionRequest("deb123", "debit", Calendar.getInstance(), 100)
       val debitPostEntity = Marshal(debitTransaction).to[MessageEntity].futureValue
 
-      val testedRoute = Post(s"/accounts/${account.id}/debit", debitPostEntity) ~>
+      val testedRoute = Post(s"/accounts/${openAccountRequest.id}/debit", debitPostEntity) ~>
         AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
       testedRoute ~> check {
@@ -143,13 +145,13 @@ class AccountRouteTest extends AnyWordSpecLike
 
   "Balance" must {
     "returned in HTTP OK with the current balance" in {
-      val account = AccountRequest("123")
-      val accountEntity = testKit.spawn(AccountLedgerActor(account.id))
+      val openAccountRequest = createOpenAccountRequest
+      val accountEntity = testKit.spawn(AccountLedgerActor(openAccountRequest.id))
 
-      openAccount(accountEntity)
+      openAccount(accountEntity, openAccountRequest)
       deposit(accountEntity, 100)
 
-      val testedRoute = Get(s"/accounts/${account.id}/balance") ~>
+      val testedRoute = Get(s"/accounts/${openAccountRequest.id}/balance") ~>
         AccountRoute.route(AccountTestEntityFactory(accountEntity))
 
       testedRoute ~> check {
@@ -160,9 +162,9 @@ class AccountRouteTest extends AnyWordSpecLike
     }
   }
 
-  private def openAccount(accountEntity: ActorRef[AccountLedgerActor.Command]) = {
+  private def openAccount(accountEntity: ActorRef[AccountLedgerActor.Command], openAccountRequest: OpenAccountRequest) = {
     val createAccountReplyProbe = testKit.createTestProbe[StatusReply[Done]]
-    accountEntity ! AccountLedgerActor.OpenAccount(createAccountReplyProbe.ref)
+    accountEntity ! AccountLedgerActor.OpenAccount(openAccountRequest.userId, createAccountReplyProbe.ref)
   }
 
   private def deposit(accountEntity: ActorRef[AccountLedgerActor.Command], amount: BigDecimal): Unit = {

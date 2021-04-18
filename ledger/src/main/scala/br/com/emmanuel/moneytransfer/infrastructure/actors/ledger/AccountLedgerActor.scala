@@ -29,7 +29,7 @@ object AccountLedgerActor {
   sealed trait Command extends SerializableMessage
 
   //write commands
-  final case class OpenAccount(replyTo: ReplyActorType) extends Command with HasReply
+  final case class OpenAccount(userId: String, replyTo: ReplyActorType) extends Command with HasReply
   final case class CloseAccount(replyTo: ReplyActorType) extends Command with HasReply
   final case class Credit(kind: String, instant: Calendar, amount: BigDecimal, replyTo: ReplyActorType) extends Command with HasReply
   final case class Debit(kind: String, instant: Calendar, amount: BigDecimal, replyTo: ReplyActorType) extends Command with HasReply
@@ -89,7 +89,7 @@ object AccountLedgerActor {
   }
 
   private def openAccount(cmd: OpenAccount): Effect[Event, Account] = {
-    Effect.persist(AccountOpened).thenReply(cmd.replyTo)(_ => StatusReply.Ack)
+    Effect.persist(AccountOpened(cmd.userId)).thenReply(cmd.replyTo)(_ => StatusReply.Ack)
   }
 
   private def credit(cmd: Credit): Effect[Event, Account] = {
