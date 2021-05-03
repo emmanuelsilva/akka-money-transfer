@@ -3,7 +3,7 @@ package br.com.emmanuel.moneytransfer.domain
 import br.com.emmanuel.moneytransfer.event.AccountEvent.{AccountClosed, Debited, Deposited}
 import br.com.emmanuel.moneytransfer.event.Event
 
-final case class OpenedAccount(id: String, userId: String, balance: BigDecimal, transactions: Seq[Transaction]) extends Account {
+final case class OpenedAccount(id: String, customerId: String, balance: BigDecimal, transactions: Seq[Transaction]) extends Account {
 
   require(balance >= 0, "Account balance can't be negative")
 

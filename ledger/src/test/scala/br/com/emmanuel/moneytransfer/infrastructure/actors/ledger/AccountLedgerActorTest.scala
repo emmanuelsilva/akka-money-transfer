@@ -25,7 +25,7 @@ class AccountLedgerActorTest
     AccountLedgerActor("1")
   )
 
-  private val mockUserId = "123"
+  private val customerId = "123"
   private val instant = Calendar.getInstance()
 
   override protected def beforeEach(): Unit = {
@@ -36,23 +36,23 @@ class AccountLedgerActorTest
   "Account" must {
 
     "be opened with zero balance" in {
-      val result = eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      val result = eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
       result.reply shouldBe StatusReply.Ack
       result.event shouldBe AccountOpened
 
       val state =  result.stateOfType[OpenedAccount]
-      state.userId shouldBe mockUserId
+      state.customerId shouldBe customerId
       state.balance shouldBe 0
     }
 
     "handle deposit" in {
-      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
 
       val result = eventSourcedTestKit.runCommand[StatusReply[Done]](Credit("deposit", instant, 100, _))
 
       result.reply shouldBe StatusReply.Ack
       result.stateOfType[OpenedAccount].balance shouldBe 100
-      result.stateOfType[OpenedAccount].userId shouldBe mockUserId
+      result.stateOfType[OpenedAccount].customerId shouldBe customerId
 
       val depositedEvent = result.eventOfType[Deposited]
       depositedEvent.amount shouldBe 100
@@ -61,7 +61,7 @@ class AccountLedgerActorTest
     }
 
     "handle debit" in {
-      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
       eventSourcedTestKit.runCommand[StatusReply[Done]](Credit("deposit", instant, 100, _))
       val result = eventSourcedTestKit.runCommand[StatusReply[Done]](Debit("debit", instant, 50, _))
 
@@ -75,7 +75,7 @@ class AccountLedgerActorTest
     }
 
     "reject debit overdraft" in {
-      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
       eventSourcedTestKit.runCommand[StatusReply[Done]](Credit("deposit", instant, 100, _))
       val result = eventSourcedTestKit.runCommand[StatusReply[Done]](Debit("debit", instant, 200, _))
 
@@ -84,7 +84,7 @@ class AccountLedgerActorTest
     }
 
     "handle close account" in {
-      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
       val result = eventSourcedTestKit.runCommand[StatusReply[Done]](CloseAccount)
 
       result.reply shouldBe StatusReply.Ack
@@ -93,7 +93,7 @@ class AccountLedgerActorTest
     }
 
     "reject deposit when it's closed" in {
-      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
       eventSourcedTestKit.runCommand[StatusReply[Done]](CloseAccount)
       val result = eventSourcedTestKit.runCommand[StatusReply[Done]](Credit("deposit", instant, 100, _))
 
@@ -109,7 +109,7 @@ class AccountLedgerActorTest
     }
 
     "handle get balance when it's closed" in {
-      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
       eventSourcedTestKit.runCommand[StatusReply[Done]](CloseAccount)
 
       val result = eventSourcedTestKit.runCommand[Reply](GetBalance)
@@ -120,7 +120,7 @@ class AccountLedgerActorTest
     }
 
     "handle get balance" in {
-      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(mockUserId, _))
+      eventSourcedTestKit.runCommand[StatusReply[Done]](OpenAccount(customerId, _))
       eventSourcedTestKit.runCommand[StatusReply[Done]](Credit("deposit", instant, 100, _))
 
       val result = eventSourcedTestKit.runCommand[Reply](GetBalance)

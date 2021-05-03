@@ -28,7 +28,7 @@ object AccountRoute extends HasJsonSerializer {
             post {
               entity(as[OpenAccountRequest]) { openAccountRequest => {
                 val accountEntity = factory.getAccountEntity(openAccountRequest.id)
-                val request = accountEntity.askWithStatus(rep => AccountLedgerActor.OpenAccount(openAccountRequest.userId, rep))
+                val request = accountEntity.askWithStatus(rep => AccountLedgerActor.OpenAccount(openAccountRequest.customerId, rep))
 
                 onComplete(request) {
                   case Success(_)                             => complete(StatusCodes.Created)

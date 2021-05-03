@@ -164,7 +164,7 @@ class AccountRouteTest extends AnyWordSpecLike
 
   private def openAccount(accountEntity: ActorRef[AccountLedgerActor.Command], openAccountRequest: OpenAccountRequest) = {
     val createAccountReplyProbe = testKit.createTestProbe[StatusReply[Done]]
-    accountEntity ! AccountLedgerActor.OpenAccount(openAccountRequest.userId, createAccountReplyProbe.ref)
+    accountEntity ! AccountLedgerActor.OpenAccount(openAccountRequest.customerId, createAccountReplyProbe.ref)
   }
 
   private def deposit(accountEntity: ActorRef[AccountLedgerActor.Command], amount: BigDecimal): Unit = {

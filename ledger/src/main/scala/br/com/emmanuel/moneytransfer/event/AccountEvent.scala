@@ -9,7 +9,7 @@ sealed trait Event extends SerializableMessage
 object AccountEvent {
 
   case object AccountClosed extends Event
-  final case class AccountOpened(userId: String) extends Event
+  final case class AccountOpened(customerId: String) extends Event
   final case class Deposited(kind: String, instant: Calendar, amount: BigDecimal) extends Event
   final case class Debited(kind: String, instant: Calendar, amount: BigDecimal) extends Event
 
