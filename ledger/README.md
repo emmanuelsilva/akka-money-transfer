@@ -21,6 +21,9 @@ The project setup is based on the SBT tool.
 
 ```shell
 sbt docker:publishLocal
+
+docker tag <image-id> emmanuelsilva/ledger
+docker push emmanuelsilva/ledger
 ```
 
 ### Create Kubernetes resources:
@@ -34,6 +37,11 @@ minikube addons enable ingress
 ```
 
 *The argument --vm=true is required in order to make the ingress work in the minikube on mac os.
+
+- Create namespace:
+```shell
+kubectl apply -f kubernetes/namespace.yaml
+```
 
 - Create service account and role:
 ```shell

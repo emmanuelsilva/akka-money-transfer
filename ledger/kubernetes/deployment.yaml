@@ -5,7 +5,7 @@ metadata:
     app: ledger
   name: ledger
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: ledger
@@ -23,8 +23,8 @@ spec:
     spec:
       containers:
         - name: ledger
-          image: ledger:1.0
-          imagePullPolicy: Never
+          image: emmanuelsilva/ledger:latest
+          imagePullPolicy: Always
           livenessProbe:
             initialDelaySeconds: 60
             periodSeconds: 60
