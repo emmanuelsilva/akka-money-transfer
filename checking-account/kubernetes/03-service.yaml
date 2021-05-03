@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: checking-account-service
+spec:
+  type: ClusterIP
+  selector:
+    app: checking-account
+  ports:
+    - protocol: TCP
+      name: api
+      port: 8080
