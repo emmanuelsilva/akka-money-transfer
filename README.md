@@ -1,4 +1,4 @@
-# Reactive Bank Account (P2P transfer) using Akka + Scala + Kafka + Microservices
+# Microservice reactive bank
 
 Project to learn and put in practice some concepts such as the actors model, CQRS and asynchronous microservices by simulating a bank account which users can transfer money through P2P transactions.
 
