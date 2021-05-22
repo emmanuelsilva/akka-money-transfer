@@ -22,8 +22,8 @@ The project setup is based on the SBT tool.
 ```shell
 sbt docker:publishLocal
 
-docker tag <image-id> emmanuelsilva/ledger
-docker push emmanuelsilva/ledger
+docker tag <image-id> emmanuelsilva/ledger:<version>
+docker push emmanuelsilva/ledger:<version>
 ```
 
 ### Create Kubernetes resources:
@@ -66,6 +66,11 @@ kubectl apply -n ledger -f kubernetes/ingress.yaml
 - Scale in/out:
 ```shell
 kubectl scale deployments/ledger --replicas=<desired-replicas>
+```
+
+### Rollout update
+```shell
+kubectl set image deployments/ledger ledger=emmanuelsilva/ledger:<version>
 ```
 
 ### Akka cluster HTTP API

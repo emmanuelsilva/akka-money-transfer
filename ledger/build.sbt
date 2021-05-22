@@ -1,7 +1,8 @@
 scalaVersion := "2.13.1"
 name := "ledger"
 organization := "br.com.emmanuel.moneytransfer"
-version := "1.0"
+version := "1.0.12"
+dockerBaseImage := "openjdk:11-jdk"
 
 enablePlugins(JavaServerAppPackaging, DockerPlugin)
 
@@ -17,7 +18,7 @@ libraryDependencies += "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV
 libraryDependencies += "ch.qos.logback"    % "logback-classic" % "1.2.3"
 
 // akka cluster libraries
-val akkaManagementVersion = "1.0.10"
+val akkaManagementVersion = "1.0.2"
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-cluster-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-cluster-sharding-typed" % akkaVersion,
@@ -32,6 +33,12 @@ libraryDependencies ++= Seq(
 //akka persistence (event sourcing) libraries
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion
+)
+
+//alpakka kafka stream connector
+val akkaStreamVersion = "2.0.7"
+libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-stream-kafka" % akkaStreamVersion
 )
 
 // testing libraries
