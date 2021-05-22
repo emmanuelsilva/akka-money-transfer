@@ -1,9 +1,11 @@
 package dev.emmanuel.account.configuration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.emmanuel.account.event.AccountEvent;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.LongSerializer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +26,9 @@ public class KafkaConfiguration {
     @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String kafkaBootstrapConfig;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Bean
     public NewTopic accountEventsTopic() {
         return TopicBuilder
@@ -35,7 +40,10 @@ public class KafkaConfiguration {
 
     @Bean
     public ProducerFactory<Long, AccountEvent> producerFactory() {
-        return new DefaultKafkaProducerFactory<>(producerConfigs());
+        return new DefaultKafkaProducerFactory<>(producerConfigs(),
+                new LongSerializer(),
+                new JsonSerializer<>(objectMapper)
+        );
     }
 
     @Bean

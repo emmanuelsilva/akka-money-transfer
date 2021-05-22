@@ -31,12 +31,12 @@ public class OpenCheckingAccountService {
                 .flatMap(input -> checkingAccountRepository.findByCustomerId(input.getCustomer().getId()))
                 .flatMap(existent -> Mono.<CheckingAccount>error(CheckingAccountAlreadyOpened::new))
                 .switchIfEmpty(Mono.defer(() -> checkingAccountRepository.save(checkingAccount)))
-                .doOnSuccess(this::publishOpenedCheckingAccountMessage)
+                .doOnSuccess(this::publishOpenedCheckingAccountEvent)
                 .doOnError(CheckingAccountAlreadyOpened.class, this::handleAccountAlreadyOpened)
                 .doOnError(ViolationException.class, this::handleInputViolation);
     }
 
-    private ListenableFuture publishOpenedCheckingAccountMessage(CheckingAccount openedCheckingAccount) {
+    private ListenableFuture publishOpenedCheckingAccountEvent(CheckingAccount openedCheckingAccount) {
         var event = AccountEvent.of("opened", openedCheckingAccount);
         return kafkaTemplate.send("checking_account_event", openedCheckingAccount.getId(), event);
     }

@@ -25,7 +25,8 @@ public class CheckingAccountReaderConverter implements Converter<Row, CheckingAc
                 version,
                 iban,
                 currencyCode,
-                customer);
+                customer
+        );
     }
 
     private Customer readCustomer(Row row) {
