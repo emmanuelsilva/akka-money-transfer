@@ -53,7 +53,8 @@ object CheckingAccountConsumer {
       .committableSource(consumerSettings, Subscriptions.topics("checking_account_event"))
       .mapAsync(1)(message => {
         system.log.debug(s"received new account kafka message key=${message.record.key()} - value=${message.record.value()}")
-        Future.successful((mapper.readValue[AccountEvent](message.record.value()), message))
+        val accountEvent = mapper.readValue[AccountEvent](message.record.value())
+        Future.successful((accountEvent, message))
       })
       .mapAsync(1)(message => {
         val (event, kafkaMessage) = message
