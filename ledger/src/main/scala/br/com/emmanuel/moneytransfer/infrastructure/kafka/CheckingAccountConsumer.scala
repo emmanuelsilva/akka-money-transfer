@@ -23,9 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 private case class Customer(id: Long, name: String)
 private case class CheckingAccount(id: Long, version: Long, iban: String, currency: String, customer: Customer)
-private case class AccountEvent(@JsonProperty("type") eventType: String,
-                                timestamp: String,
-                                checkingAccount: CheckingAccount)
+private case class AccountEvent(@JsonProperty("type") eventType: String, timestamp: String, checkingAccount: CheckingAccount)
 
 object CheckingAccountConsumer {
 
@@ -33,9 +31,9 @@ object CheckingAccountConsumer {
 
   def start(system: ActorSystem[Nothing], sharding: ClusterSharding)(implicit scheduler: Scheduler,
                                                                      executionContext: ExecutionContext): Unit = {
-    println("starting kafka consumer...")
-    implicit val materializer: Materializer = Materializer(system)
+    system.log.info("starting kafka consumer")
 
+    implicit val materializer: Materializer = Materializer(system)
     val entityFactory = ShardingAccountEntityFactory(sharding)
 
     val mapper = new ObjectMapper() with ScalaObjectMapper
@@ -54,7 +52,7 @@ object CheckingAccountConsumer {
     Consumer
       .committableSource(consumerSettings, Subscriptions.topics("checking_account_event"))
       .mapAsync(1)(message => {
-        println(s"received new account kafka message key=${message.record.key()} - value=${message.record.value()}")
+        system.log.debug(s"received new account kafka message key=${message.record.key()} - value=${message.record.value()}")
         Future.successful((mapper.readValue[AccountEvent](message.record.value()), message))
       })
       .mapAsync(1)(message => {
@@ -62,7 +60,7 @@ object CheckingAccountConsumer {
         val accountEntity = entityFactory.getAccountEntity(event.checkingAccount.id.toString)
         processEvent(event, accountEntity)
           .map(result => {
-            println(s"${event.checkingAccount.id} - ${event.eventType} - result - ${result}")
+            system.log.debug(s"${event.checkingAccount.id} - ${event.eventType} - creation result - $result")
             kafkaMessage.committableOffset
           })
       })
