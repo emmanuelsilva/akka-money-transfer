@@ -17,7 +17,7 @@ class CheckingAccountInputValidatorTest {
     }
 
     @Test
-    void shouldDoesNotRejectValidInput() {
+    void shouldDoNotRejectValidInput() {
         var customer = Customer.of(1, "Mock Customer");
         var checkingAccount = CheckingAccount.of("IBAN", "EUR", customer);
 

@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.concurrent.ListenableFuture;
 import reactor.core.publisher.Mono;
 
 @Slf4j
@@ -21,11 +20,10 @@ public class OpenCheckingAccountService {
 
     private final KafkaTemplate<Long, AccountEvent> kafkaTemplate;
     private final CheckingAccountRepository checkingAccountRepository;
+    private final CheckingAccountInputValidator inputValidator;
 
     @Transactional
     public Mono<CheckingAccount> open(CheckingAccount checkingAccount) {
-        CheckingAccountInputValidator inputValidator = new CheckingAccountInputValidator();
-
         return inputValidator
                 .validate(checkingAccount)
                 .flatMap(input -> checkingAccountRepository.findByCustomerId(input.getCustomer().getId()))
@@ -36,9 +34,9 @@ public class OpenCheckingAccountService {
                 .doOnError(ViolationException.class, this::handleInputViolation);
     }
 
-    private ListenableFuture publishOpenedCheckingAccountEvent(CheckingAccount openedCheckingAccount) {
+    private void publishOpenedCheckingAccountEvent(CheckingAccount openedCheckingAccount) {
         var event = AccountEvent.of("opened", openedCheckingAccount);
-        return kafkaTemplate.send("checking_account_event", openedCheckingAccount.getId(), event);
+        kafkaTemplate.send("checking_account_event", openedCheckingAccount.getId(), event);
     }
 
     private void handleAccountAlreadyOpened(CheckingAccountAlreadyOpened ex) {

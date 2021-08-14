@@ -2,9 +2,11 @@ package dev.emmanuel.account.service;
 
 import dev.emmanuel.account.event.AccountEvent;
 import dev.emmanuel.account.exception.CheckingAccountAlreadyOpened;
+import dev.emmanuel.account.exception.violation.ViolationException;
 import dev.emmanuel.account.persistence.entity.CheckingAccount;
 import dev.emmanuel.account.persistence.entity.Customer;
 import dev.emmanuel.account.persistence.repository.CheckingAccountRepository;
+import dev.emmanuel.account.validator.CheckingAccountInputValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -26,7 +28,12 @@ class OpenCheckingAccountServiceTest {
     void setUp() {
         this.kafkaTemplate = mock(KafkaTemplate.class);
         this.checkingAccountRepository = mock(CheckingAccountRepository.class);
-        this.openCheckingAccountService = new OpenCheckingAccountService(this.kafkaTemplate, this.checkingAccountRepository);
+
+        this.openCheckingAccountService = new OpenCheckingAccountService(
+          this.kafkaTemplate,
+          this.checkingAccountRepository,
+          new CheckingAccountInputValidator()
+        );
     }
 
     @Test
@@ -59,6 +66,19 @@ class OpenCheckingAccountServiceTest {
                 .create(openCheckingAccountService.open(checkingAccount))
                 .expectError(CheckingAccountAlreadyOpened.class)
                 .verify();
+
+        verify(kafkaTemplate, never()).send(eq("checking_account_event"), any(AccountEvent.class));
+    }
+
+    @Test
+    void shouldRejectInvalidInput() {
+        Customer customer = Customer.of(1, "Emmanuel");
+        CheckingAccount invalidIbanCheckingAccount = CheckingAccount.of(null, "EUR", customer);
+
+        StepVerifier
+          .create(openCheckingAccountService.open(invalidIbanCheckingAccount))
+          .expectError(ViolationException.class)
+          .verify();
 
         verify(kafkaTemplate, never()).send(eq("checking_account_event"), any(AccountEvent.class));
     }

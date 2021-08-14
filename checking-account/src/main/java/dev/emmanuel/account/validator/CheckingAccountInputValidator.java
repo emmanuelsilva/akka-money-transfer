@@ -16,10 +16,10 @@ public class CheckingAccountInputValidator {
     private final Validator<CheckingAccount> validator;
 
     public CheckingAccountInputValidator() {
-        this.validator = this.buildValidator();
+        this.validator = this.buildInputCheckingAccountValidator();
     }
 
-    private Validator<CheckingAccount> buildValidator() {
+    private Validator<CheckingAccount> buildInputCheckingAccountValidator() {
         Validator<Customer> customerValidator = ValidatorBuilder.<Customer>of()
                 .constraint(Customer::getId, "id", c -> c.greaterThan(0L).message("customer id is required"))
                 .constraint(Customer::getName, "name", c -> c.notBlank().message("customer name is required"))
@@ -34,7 +34,6 @@ public class CheckingAccountInputValidator {
 
         return checkingAccountValidator;
     }
-
 
     public Mono<CheckingAccount> validate(CheckingAccount checkingAccount) {
         ConstraintViolations accountViolations = validator.validate(checkingAccount);
